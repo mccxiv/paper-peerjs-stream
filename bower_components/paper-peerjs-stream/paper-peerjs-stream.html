@@ -1,0 +1,142 @@
+<link rel="import" href="../polymer/polymer.html">
+<script src="../peerjs/peer.js"></script> <!-- TODO: use min -->
+
+<polymer-element name="paper-peerjs-stream">
+
+	<template>
+		<video src="{{_remoteStream}}" autoplay muted></video>
+	</template>
+
+	<script>
+
+		//noinspection JSValidateTypes
+
+		Polymer({
+			publish: {
+
+				/**
+				 * Your PeerJS API key.
+				 *
+				 * @attribute key
+				 * @type string
+				 * @default null
+				 */
+				key: null,
+
+				/**
+				 * This peer's ID.
+				 * Optional, the server can provide one
+				 *
+				 * @attribute self
+				 * @type string
+				 * @default null
+				 */
+				self: {value: null, reflect: true},
+
+				/**
+				 * The ID of the remote peer.
+				 * Only required if initiating contact.
+				 *
+				 * @attribute remote
+				 * @type string
+				 * @default null
+				 */
+				remote: {value: null, reflect: true},
+
+				/**
+				 * If true, calls will be answered automatically.
+				 * If a stream was provided, it will be sent with the answer.
+				 *
+				 * @attribute answers
+				 * @type boolean
+				 * @default false
+				 */
+				answers: {value: false, reflect: true},
+
+				/**
+				 * If true, requests to get called.
+				 * PeerJS does not support initiating one-way calls so the
+				 * only way to receive a stream without sending one is to ask.
+				 *
+				 * Starts data connection with its metadata set to 'call-request'
+				 *
+				 * @attribute requests
+				 * @type boolean
+				 * @default false
+				 */
+				requests: {value: false, reflect: true}
+			},
+
+			_activeCall: null,
+			_queuedCallRequest: 0,
+
+			ready: function() {
+				var peerOpts = {debug: 3};
+				if (this.key) peerOpts.key = this.key;
+				this.peer = this.self? new Peer(this.self, peerOpts) : new Peer(peerOpts);
+				if (this.requests) this._requestCall();
+				this._setHandlers();
+			},
+
+			_setHandlers: function() {
+				this.peer.on('open', this._handlePeerOpen.bind(this));
+				this.peer.on('call', this._handleCall.bind(this));
+				this.peer.on('error', this._handlePeerError.bind(this));
+			},
+
+			_handlePeerOpen: function(id) {
+				this.self = id;
+			},
+
+			_handleCall: function(call) {
+				if (!this.answers) return;
+				call.answer();
+				call.on('stream', this._streamEndHandler.bind(this));
+			},
+
+			_handlePeerError: function(error) {
+				// TODO: handle peer error
+			},
+
+			_requestCall: function()
+			{
+				if (this._queuedCallRequest) return;
+				var successful = false;
+
+				var conn = this.peer.connect(this.remote, {
+					reliable: true,
+					metadata: 'call-request'
+				});
+
+				conn.on('open', function() {
+					successful = true;
+				});
+
+				conn.on('error', function() {
+					if (!successful) this._requestCallDelayed();
+				});
+
+				conn.on('close', function() {
+					if (!successful) this._requestCallDelayed();
+				});
+			},
+
+			_requestCallDelayed: function() {
+				if (this._queuedCallRequest) return;
+				this._queuedCallRequest = setTimeout(function() {
+					this._queuedCallRequest = null;
+					this._requestCall();
+				}.bind(this), 3000);
+			},
+
+			_streamEndHandler: function(stream) {
+				this._remoteStream = URL.createObjectURL(stream);
+				stream.addEventListener('ended', function() {
+					console.warn('stream ended??');
+					// TODO: handle stream ended
+				});
+			}
+		});
+	</script>
+
+</polymer-element>
