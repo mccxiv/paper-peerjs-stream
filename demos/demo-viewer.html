@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head lang="en">
-	<script src="bower_components/webcomponentsjs/webcomponents.js"></script>
-	<link rel="import" href="bower_components/paper-peerjs-stream/paper-peerjs-stream.html">
+	<script src="../../webcomponentsjs/webcomponents.js"></script>
+	<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
 
 	<style>
 		#demo {
@@ -16,7 +16,12 @@
 <body>
 
 	<!-- This guy doesn't send any media, it only answers and plays back from incoming calls -->
+
+	<!--
 	<paper-peerjs-stream key="y6ws1u4by75mte29" remote="broadcaster" requests answers></paper-peerjs-stream>
+	-->
+
+	<paper-peerjs-stream host="tranquil-waters-9294.herokuapp.com" remote="broadcaster" requests answers></paper-peerjs-stream>
 
 
 	<div id="demo"></div>

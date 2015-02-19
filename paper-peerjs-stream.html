@@ -1,3 +1,5 @@
+<!--suppress HtmlUnknownTarget -->
+
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../paper-spinner/paper-spinner.html">
 
@@ -33,22 +35,53 @@
 
 		<div class="main" >
 			<video src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
-			<paper-spinner active="{{loading}}"></paper-spinner>
+
+			<template if="{{loading}}">
+				<paper-spinner active></paper-spinner>
+			</template>
 		</div>
 	</template>
 
 	<script>
+
+		//noinspection JSValidateTypes, JSUnusedGlobalSymbols
+
 		Polymer({
 			publish: {
 
 				/**
-				 * Your PeerJS API key.
+				 * Using the official cloud server?
+				 * Provide your PeerJS API key.
 				 *
 				 * @attribute key
 				 * @type string
-				 * @default null
 				 */
 				key: null,
+
+				/**
+				 * Hosting your own server? https://github.com/peers/peerjs-server
+				 * These properties will be used if no key was provided
+				 *
+				 *
+				 * PeerJS server host (omit http://)
+				 *
+				 * @attribute host
+				 * @type string
+				 * @default 'localhost'
+				 *
+				 * PeerJS server port
+				 * @attribute port
+				 * @type number
+				 * @default 80
+				 *
+				 * Path on the server
+				 * @attribute path
+				 * @type string
+				 * @default '/'
+				 */
+				host: 'localhost',
+				port: 80,
+				path: '/',
 
 				/**
 				 * This peer's ID.
@@ -56,7 +89,6 @@
 				 *
 				 * @attribute self
 				 * @type string
-				 * @default null
 				 */
 				self: {value: null, reflect: true},
 
@@ -66,7 +98,6 @@
 				 *
 				 * @attribute remote
 				 * @type string
-				 * @default null
 				 */
 				remote: {value: null, reflect: true},
 
@@ -98,21 +129,24 @@
 				loading: '!_remoteStream || _remoteStream.ended'
 			},
 
-			//loading
-
-			_activeCall: null,
 			_remoteStream: null,
+			_remoteStreamURL: null,
 			_queuedCallRequest: 0,
 
 			ready: function() {
 				var peerOpts = {debug: 3};
 				if (this.key) peerOpts.key = this.key;
+				else {
+					peerOpts.host = this.host;
+					peerOpts.port = this.port;
+					peerOpts.path = this.path;
+				}
 				this.peer = this.self? new Peer(this.self, peerOpts) : new Peer(peerOpts);
 				if (this.requests) this._requestCall();
-				this._setHandlers();
+				this._setPeerHandlers();
 			},
 
-			_setHandlers: function() {
+			_setPeerHandlers: function() {
 				this.peer.on('open', this._handlePeerOpen.bind(this));
 				this.peer.on('call', this._handleCall.bind(this));
 				this.peer.on('error', this._handlePeerError.bind(this));
@@ -122,18 +156,17 @@
 				this.self = id;
 			},
 
+			_handlePeerError: function(error) {
+				// TODO: handle peer error
+			},
+
 			_handleCall: function(call) {
 				if (!this.answers) return;
 				call.answer();
 				call.on('stream', this._streamHandler.bind(this));
 			},
 
-			_handlePeerError: function(error) {
-				// TODO: handle peer error
-			},
-
-			_requestCall: function()
-			{
+			_requestCall: function() {
 				if (this._queuedCallRequest) return;
 				var successful = false;
 
@@ -168,23 +201,18 @@
 				this._remoteStreamURL = URL.createObjectURL(stream);
 				stream.addEventListener('ended', function() {
 					console.warn('stream ended??');
+					console.log('stream', stream);
 
 					// TODO: handle stream ended
 				});
 			},
 
 			_handlePlaying: function(e, detail, sender) {
-
-				console.info('playback started, animating video element');
-
-				sender.animate(
-					[
+				//noinspection JSUnresolvedFunction
+				sender.animate([
 						{opacity: 0, transform: 'scale3d(.3, .3, .3)'},
-						{opacity: 1, transform: 'none'}
-					],
-					{
-						duration: 500, easing: 'cubic-bezier(.55,0,.1,1)'
-					}
+					 	{opacity: 1, transform: 'none'}],
+					{duration: 500, easing: 'cubic-bezier(.55,0,.1,1)'}
 				);
 			}
 		});
