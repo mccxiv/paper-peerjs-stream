@@ -14,8 +14,7 @@
 				background-color: black;
 			}
 
-			video
-			{
+			video {
 				display: block;
 				margin: 0 auto;
 			}
@@ -33,7 +32,7 @@
 			}
 		</style>
 
-		<div class="main" >
+		<div class="main">
 			<video src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
 
 			<template if="{{loading}}">
@@ -62,9 +61,7 @@
 				 * Hosting your own server? https://github.com/peers/peerjs-server
 				 * These properties will be used if no key was provided
 				 *
-				 *
 				 * PeerJS server host (omit http://)
-				 *
 				 * @attribute host
 				 * @type string
 				 * @default 'localhost'
