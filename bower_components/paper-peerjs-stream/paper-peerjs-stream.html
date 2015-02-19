@@ -1,16 +1,43 @@
 <link rel="import" href="../polymer/polymer.html">
-<script src="../peerjs/peer.js"></script> <!-- TODO: use min -->
+<link rel="import" href="../paper-spinner/paper-spinner.html">
+
+<script src="../peerjs/peer.js"></script> <!-- TODO: use min, use import maybe? -->
 
 <polymer-element name="paper-peerjs-stream">
 
 	<template>
-		<video src="{{_remoteStream}}" autoplay muted></video>
+		<style>
+			.main {
+				position: relative;
+				background-color: black;
+			}
+
+			video
+			{
+				display: block;
+				margin: 0 auto;
+			}
+
+			paper-spinner {
+				width: 86px;
+				height: 86px;
+				top: calc(50% - 43px);
+				left: calc(50% - 43px);
+				position: absolute;
+			}
+
+			paper-spinner::shadow .circle {
+				border-width: 8px;
+			}
+		</style>
+
+		<div class="main" >
+			<video src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
+			<paper-spinner active="{{loading}}"></paper-spinner>
+		</div>
 	</template>
 
 	<script>
-
-		//noinspection JSValidateTypes
-
 		Polymer({
 			publish: {
 
@@ -67,7 +94,14 @@
 				requests: {value: false, reflect: true}
 			},
 
+			computed: {
+				loading: '!_remoteStream || _remoteStream.ended'
+			},
+
+			//loading
+
 			_activeCall: null,
+			_remoteStream: null,
 			_queuedCallRequest: 0,
 
 			ready: function() {
@@ -91,7 +125,7 @@
 			_handleCall: function(call) {
 				if (!this.answers) return;
 				call.answer();
-				call.on('stream', this._streamEndHandler.bind(this));
+				call.on('stream', this._streamHandler.bind(this));
 			},
 
 			_handlePeerError: function(error) {
@@ -129,12 +163,29 @@
 				}.bind(this), 3000);
 			},
 
-			_streamEndHandler: function(stream) {
-				this._remoteStream = URL.createObjectURL(stream);
+			_streamHandler: function(stream) {
+				this._remoteStream = stream;
+				this._remoteStreamURL = URL.createObjectURL(stream);
 				stream.addEventListener('ended', function() {
 					console.warn('stream ended??');
+
 					// TODO: handle stream ended
 				});
+			},
+
+			_handlePlaying: function(e, detail, sender) {
+
+				console.info('playback started, animating video element');
+
+				sender.animate(
+					[
+						{opacity: 0, transform: 'scale3d(.3, .3, .3)'},
+						{opacity: 1, transform: 'none'}
+					],
+					{
+						duration: 500, easing: 'cubic-bezier(.55,0,.1,1)'
+					}
+				);
 			}
 		});
 	</script>
