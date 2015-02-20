@@ -17,7 +17,7 @@
 			}
 
 			video {
-				height: 100%
+				height: 100%;
 				display: block;
 				margin: 0 auto;
 			}
@@ -45,6 +45,8 @@
 	</template>
 
 	<script>
+
+		'use strict';
 
 		//noinspection JSValidateTypes, JSUnusedGlobalSymbols
 
@@ -131,23 +133,53 @@
 
 			computed: {
 				inCall: '!!_call',
+				peerActive: 'peer && !peer.destroyed',
 				haveLocalStream: '_localStream && !_localStream.ended',
 				haveRemoteStream: '_remoteStream && !_remoteStream.ended'
 			},
 
-			_call : null,
-			_localStream: null,
-			_remoteStream: null,
-			_remoteStreamURL: null,
-			_queuedCallRequest: 0,
-			_queuedPeerCreation : 0,
+			_call : null,             // The current call
+			_timeout: 3000,           // Wait this long between attempts
+			_localStream: null,       // Stream that will be sent
+			_remoteStream: null,      // Stream received from call
+			_remoteStreamURL: null,   // Stream in url form, for src
+			_queuedMain : 0,
+			_queuedCallRequest: 0,    // To prevent multiple delayed operations
+			_queuedPeerCreation : 0,  // To prevent multiple delayed operations
 
 			ready: function() {
-				this._createPeer();
+				window.pps = this; // Debug
+				this._main();
 			},
 
-			_createPeer: function()
-			{
+			/**
+			 * Main program logic.
+			 * Once an operation is done, it should lead back here.
+			 *
+			 */
+			_main: function() {
+				console.log('perform()');
+				if (this.spectates || this.broadcasts) {
+					if (!this.inCall) {
+						if (!this.peerActive) this._createPeer();
+						else if (this.spectates) this._requestCall();
+					}
+					else {
+						if (this.peerActive) this.peer.destroy();
+					}
+				}
+				else console.info('perform(): No work needed, no tasks declared.')
+			},
+
+			_mainDelayed: function() {
+				if (this._queuedMain) return;
+				this._queuedMain = setTimeout(function() {
+					this._queuedMain = null;
+					this._main();
+				}.bind(this), this._timeout);
+			},
+
+			_createPeer: function()	{
 				var peerOpts = {debug: 3};
 				if (this.key) peerOpts.key = this.key;
 				else {
@@ -156,88 +188,52 @@
 					peerOpts.path = this.path;
 				}
 				this.peer = this.self? new Peer(this.self, peerOpts) : new Peer(peerOpts);
-				this._setPeerHandlers();
-			},
-
-			_setPeerHandlers: function() {
-				// TODO: handle data?
 				this.peer.on('open', this._handlePeerOpen.bind(this));
-				this.peer.on('call', this._handleCall.bind(this));
 				this.peer.on('error', this._handlePeerError.bind(this));
+				this.peer.on('call', this._handleCall.bind(this));
+				// TODO: handle data
 			},
 
 			_handlePeerOpen: function(id) {
 				this.self = id;
-				this._perform();
+				this._main(); // Job here is done.
 			},
 
 			_handlePeerError: function(error) {
-				// TODO: figure out how to handle peer-unavailable
 				if (error.type === 'peer-unavailable') {
-					this._perform();
+					// Non fatal error, give back control.
+					this._mainDelayed();
 				}
 				else {
-					// Looks like a fatal error. Giving up and retrying.
-					console.info('fatal peer error:', error);
-
-					// Check if there's already a retry attempt underway.
-					if (this._queuedPeerCreation) return;
-
-					// Make sure it's dead and request a new one in 3 seconds.
+					// Assume fatal error, make sure it's dead and yield.
 					this.peer.destroy();
-					this._queuedPeerCreation = setTimeout(function() {
-						this._queuedPeerCreation = null;
-						this._createPeer();
-					}.bind(this), 3000);
-				}
-			},
-
-			// Starts the operations the user asked for, depends on attributes
-			_perform: function() {
-				if (!this.inCall && this.spectates) this._requestCall();
-			},
-
-			_handleCall: function(call) {
-				if (this.inCall) return; // One at a time please.
-				if (call.peer !== this.spectates && !this.broadcasts) return;
-
-				var el = this;
-				this._call = call;
-				this.haveLocalStream? call.answer(this._localStream) : call.answer();
-				call.on('stream', this._streamHandler.bind(this));
-				call.on('error', callFailure);
-				call.on('close', callFailure);
-				function callFailure() {
-					call.close(); // Making sure it's destroyed.
-					el._call = null;
-					el._perform();
+					this._mainDelayed();
 				}
 			},
 
 			_requestCall: function() {
+				var pps = this;
 				var successful = false;
-
 				var conn = this.peer.connect(this.spectates, {
 					reliable: true,
 					metadata: 'call-request'
 				});
-
 				conn.on('open', function() {
 					successful = true;
-					conn.close();
-					// TODO: add resilience.
-					// At this point, we're trusting the remote peer to
-					// call us back. Should probably add some check.
-				});
+					conn.close(); // Not needed anymore, request was sent.
 
-				conn.on('error', function(e) {
-					console.info('connection error:', e);
-					if (!successful) this._requestCallDelayed();
+					// Now it's up to the broadcaster to call us back.
+					// Try again in a bit in case no call was received.
+					pps._mainDelayed()
 				});
-
-				conn.on('close', function() {
-					if (!successful) this._requestCallDelayed();
-				});
+				conn.on('error', requestFailure);
+				conn.on('close', requestFailure);
+				function requestFailure() {
+					if (!successful) {
+						console.warn('call request failed');
+						pps._mainDelayed();
+					}
+				}
 			},
 
 			_requestCallDelayed: function() {
@@ -245,20 +241,46 @@
 				this._queuedCallRequest = setTimeout(function() {
 					this._queuedCallRequest = null;
 					this._requestCall();
-				}.bind(this), 3000);
+				}.bind(this), this._timeout);
 			},
 
-			_streamHandler: function(stream) {
+			_handleCall: function(call) {
+				if (this.inCall) return; // One at a time please.
+				if (call.peer !== this.spectates && !this.broadcasts) return;
+
+				var pps = this;
+				this._call = call;
+				this.haveLocalStream? call.answer(this._localStream) : call.answer();
+				call.on('stream', this._handleStream.bind(this));
+				call.on('error', callFailure);
+				call.on('close', callFailure);
+				function callFailure(e) {
+					console.warn('call ended', e);
+					call.close(); // Making sure it's destroyed.
+					pps._call = null;
+					pps._mainDelayed();
+				}
+			},
+
+			_handleStream: function(stream) {
 				this._remoteStream = stream;
 				this._remoteStreamURL = URL.createObjectURL(stream);
-				stream.addEventListener('ended', function() {
-					console.warn('stream ended, reconnecting...');
-					if (this._call) {
-						this._call.close(); // This would trigger a retry but
-						                    // it's probably already underway
-						this._call = null;
-					}
-				});
+				stream.addEventListener('ended', this._handleStreamEnded.bind(this));
+				this._mainDelayed(); // TODO: is this unnecessary?
+			},
+
+			_handleStreamEnded: function()
+			{
+				// TODO: ??
+				// Consider a different approach. Can a stream come back
+				// using the same call?
+				console.warn('stream ended, reconnecting...');
+
+				if (this._call) {
+					this._call.close(); // Probably unnecessary
+					this._call = null;
+				}
+				this._mainDelayed();
 			},
 
 			_handlePlaying: function(e, detail, sender) {
