@@ -95,12 +95,15 @@
 				self: {value: null, reflect: true},
 
 				/**
-				 * Obtain a stream without providing one.
-				 * Value: The ID of a remote peer
+				 * The id of a remote broadcaster.
 				 *
-				 * Sends 'call requests' to the remote peer and
-				 * answers calls from that peer only.
-				 * Only one call may be active at a time.
+				 * Behavior:
+				 * - Sends call-requests (not calls) to the broadcaster.
+				 * - Answers calls from that broadcaster only.
+				 *
+				 * Explanation:
+				 * - Generally, a spectator wants to consume a particular
+				 *   broadcaster's stream, acting as a client.
 				 *
 				 * @attribute spectate
 				 * @type string
@@ -108,8 +111,15 @@
 				spectates: {value: null, reflect: true},
 
 				/**
-				 * If true, answers any incoming calls with the local stream.
-				 * Only one call may be active at a time.
+				 * If true and if a local stream was provided,
+				 * answers any incoming call requests by calling.
+				 *
+				 * Behavior:
+				 * - Responds to call-requests (not calls) by calling back.
+				 *
+				 * Explanation:
+				 * - Generally, a broadcaster will sit around waiting for
+				 *   a spectator to send a call request, acting as a server
 				 *
 				 * @attribute broadcast
 				 * @type boolean
@@ -118,17 +128,27 @@
 				broadcasts: {value: false, reflect: true},
 
 				/**
-				 * If true, requests to get called.
-				 * PeerJS does not support initiating one-way calls so the
-				 * only way to receive a stream without sending one is to ask.
+				 * If present, and if a local stream is available, calls the peer
 				 *
-				 * Starts data connection with its metadata set to 'call-request'
+				 * Behavior
+				 * - Calls peer
 				 *
-				 * @attribute requests
+				 * @attribute calls
+				 * @type string
+				 */
+				calls: null,
+
+				/**
+				 * If true, answers calls
+				 *
+				 * behavior:
+				 * - Answers any call
+				 *
+				 * @attribute answers
 				 * @type boolean
 				 * @default false
 				 */
-				requests: {value: false, reflect: true}
+				answers: {value: false, reflect: true}
 			},
 
 			computed: {
@@ -138,16 +158,14 @@
 				haveRemoteStream: '_remoteStream && !_remoteStream.ended'
 			},
 
-			_call : null,             // The current call
+			_call: null,              // The current call
 			_timeout: 3000,           // Wait this long between attempts
 			_localStream: null,       // Stream that will be sent
 			_remoteStream: null,      // Stream received from call
 			_remoteStreamURL: null,   // Stream in url form, for src
-			_queuedMain : 0,
-			_queuedCallRequest: 0,    // To prevent multiple delayed operations
-			_queuedPeerCreation : 0,  // To prevent multiple delayed operations
+			_queuedMain: 0,           // To prevent multiple operations
 
-			ready: function() {
+			ready: function () {
 				window.pps = this; // Debug
 				this._main();
 			},
@@ -157,29 +175,29 @@
 			 * Once an operation is done, it should lead back here.
 			 *
 			 */
-			_main: function() {
-				console.log('perform()');
-				if (this.spectates || this.broadcasts) {
+			_main: function () {
+				console.log('_main()');
+				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this.inCall) {
 						if (!this.peerActive) this._createPeer();
+						else if (this.calls) this._performCall();
 						else if (this.spectates) this._requestCall();
+						else console.info('_main(): waiting for connections...')
 					}
-					else {
-						if (this.peerActive) this.peer.destroy();
-					}
+					else if (this.peerActive) this.peer.destroy();
 				}
-				else console.info('perform(): No work needed, no tasks declared.')
+				else console.info('_main(): No work needed, no tasks declared.')
 			},
 
-			_mainDelayed: function() {
+			_mainDelayed: function () {
 				if (this._queuedMain) return;
-				this._queuedMain = setTimeout(function() {
+				this._queuedMain = setTimeout(function () {
 					this._queuedMain = null;
 					this._main();
 				}.bind(this), this._timeout);
 			},
 
-			_createPeer: function()	{
+			_createPeer: function () {
 				var peerOpts = {debug: 3};
 				if (this.key) peerOpts.key = this.key;
 				else {
@@ -187,38 +205,65 @@
 					peerOpts.port = this.port;
 					peerOpts.path = this.path;
 				}
-				this.peer = this.self? new Peer(this.self, peerOpts) : new Peer(peerOpts);
+				this.peer = this.self ? new Peer(this.self, peerOpts) : new Peer(peerOpts);
 				this.peer.on('open', this._handlePeerOpen.bind(this));
 				this.peer.on('error', this._handlePeerError.bind(this));
 				this.peer.on('call', this._handleCall.bind(this));
-				// TODO: handle data
+				this.peer.on('connection', this._handleConnection.bind(this));
 			},
 
-			_handlePeerOpen: function(id) {
+			_handlePeerOpen: function (id) {
 				this.self = id;
 				this._main(); // Job here is done.
 			},
 
-			_handlePeerError: function(error) {
+			_handlePeerError: function (error) {
 				if (error.type === 'peer-unavailable') {
 					// Non fatal error, give back control.
 					this._mainDelayed();
 				}
 				else {
-					// Assume fatal error, make sure it's dead and yield.
+					// Assume fatal error, make sure it's dead and go back.
 					this.peer.destroy();
 					this._mainDelayed();
 				}
 			},
 
-			_requestCall: function() {
+			_handleConnection: function(conn) {
+				if (this.broadcasts) {
+					if (conn.metadata === 'call-request') {
+						if (!this.inCall) {
+							if (this.haveLocalStream) {
+								this.peer.call(conn.peer, this._localStream)
+							}
+							else console.warn('Would have responded to call request but no stream is available');
+						}
+						else console.warn('Already in a call, ignoring call-request');
+					}
+				}
+			},
+
+			_performCall: function () {
+				if (!this.haveLocalStream) {
+					console.warn('Want to call, but no stream was provided');
+					this._mainDelayed();
+				}
+				else {
+					this._call = this.peer.call(this.calls, this._localStream);
+					this._call.on('open', this._main());
+					this._call.on('close', this._handleCallEnd.bind(this));
+					this._call.on('error', this._handleCallEnd.bind(this));
+				}
+			},
+
+			_requestCall: function () {
 				var pps = this;
 				var successful = false;
 				var conn = this.peer.connect(this.spectates, {
 					reliable: true,
 					metadata: 'call-request'
 				});
-				conn.on('open', function() {
+				conn.on('open', function () {
 					successful = true;
 					conn.close(); // Not needed anymore, request was sent.
 
@@ -226,8 +271,8 @@
 					// Try again in a bit in case no call was received.
 					pps._mainDelayed()
 				});
-				conn.on('error', requestFailure);
 				conn.on('close', requestFailure);
+				conn.on('error', requestFailure);
 				function requestFailure() {
 					if (!successful) {
 						console.warn('call request failed');
@@ -236,30 +281,22 @@
 				}
 			},
 
-			_requestCallDelayed: function() {
-				if (this._queuedCallRequest) return;
-				this._queuedCallRequest = setTimeout(function() {
-					this._queuedCallRequest = null;
-					this._requestCall();
-				}.bind(this), this._timeout);
+			_handleCall: function (call) {
+				if (this.inCall) return; // One at a time please.
+				if (call.peer !== this.spectates && !this.answers) return;
+
+				this._call = call;
+				this.haveLocalStream ? call.answer(this._localStream) : call.answer();
+				call.on('stream', this._handleStream.bind(this));
+				call.on('close', this._handleCallEnd.bind(this));
+				call.on('error', this._handleCallEnd.bind(this));
 			},
 
-			_handleCall: function(call) {
-				if (this.inCall) return; // One at a time please.
-				if (call.peer !== this.spectates && !this.broadcasts) return;
-
-				var pps = this;
-				this._call = call;
-				this.haveLocalStream? call.answer(this._localStream) : call.answer();
-				call.on('stream', this._handleStream.bind(this));
-				call.on('error', callFailure);
-				call.on('close', callFailure);
-				function callFailure(e) {
-					console.warn('call ended', e);
-					call.close(); // Making sure it's destroyed.
-					pps._call = null;
-					pps._mainDelayed();
-				}
+			_handleCallEnd: function(e) {
+				console.warn('call ended', e);
+				this._call.close(); // Making sure it's destroyed.
+				this._call = null;
+				this._mainDelayed();
 			},
 
 			_handleStream: function(stream) {
@@ -288,7 +325,7 @@
 				sender.animate([
 						{opacity: 0, transform: 'scale3d(.3, .3, .3)'},
 					 	{opacity: 1, transform: 'none'}],
-					{duration: 500, easing: 'cubic-bezier(.55,0,.1,1)'}
+					{duration: 500, easing: 'cubic-bezier(.55, 0, .1, 1)'}
 				);
 			}
 		});
