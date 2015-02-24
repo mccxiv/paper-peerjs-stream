@@ -6,15 +6,12 @@
 
 	<style>
 		paper-peerjs-stream {
-			height: 720px;
 		}
 	</style>
 </head>
 <body>
 
-	<!-- This guy doesn't send any media, it only answers and plays back from incoming calls -->
-	<!-- spectate="id": sends a call request to that peer and answers them once they call -->
-	<!-- broadcast answers any incoming call -->
-	<paper-peerjs-stream host="tranquil-waters-9294.herokuapp.com" spectates="broadcaster" broadcasts></paper-peerjs-stream>
+	<!-- Requests to get be called by 'broadcaster' -->
+	<paper-peerjs-stream host="tranquil-waters-9294.herokuapp.com" spectates="broadcaster"></paper-peerjs-stream>
 </body>
 </html>

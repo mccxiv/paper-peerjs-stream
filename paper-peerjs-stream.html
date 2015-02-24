@@ -10,7 +10,7 @@
 	<template>
 		<style>
 			:host {
-				height: 720px;
+				min-height: 100px;
 				display: block;
 				position: relative;
 				background-color: black;
@@ -153,11 +153,14 @@
 
 			computed: {
 				inCall: '!!_call',
-				peerActive: 'peer && !peer.destroyed',
+				peerActive: 'peer && !peer.destroyed && !peer.disconnected',
+				peerDestroyed: 'peer && peer.destroyed',
+				peerDisconnected: 'peer && peer.disconnected',
 				haveLocalStream: '_localStream && !_localStream.ended',
 				haveRemoteStream: '_remoteStream && !_remoteStream.ended'
 			},
 
+			peer : undefined,         // PeerJS instance, will change throughout lifecycle
 			_call: null,              // The current call
 			_timeout: 3000,           // Wait this long between attempts
 			_localStream: null,       // Stream that will be sent
@@ -165,31 +168,56 @@
 			_remoteStreamURL: null,   // Stream in url form, for src
 			_queuedMain: 0,           // To prevent multiple operations
 
-			ready: function () {
+			setStream: function(stream) {
+				this._localStream = stream;
+				this._main();
+			},
+
+			ready: function() {
 				window.pps = this; // Debug
 				this._main();
 			},
 
 			/**
 			 * Main program logic.
-			 * Once an operation is done, it should lead back here.
-			 *
+			 * Should run once an operation finishes and on certain events
 			 */
-			_main: function () {
-				console.log('_main()');
+			_main: function() {
+				console.log('_main(): checking what needs to be done');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this.inCall) {
-						if (!this.peerActive) this._createPeer();
-						else if (this.calls) this._performCall();
-						else if (this.spectates) this._requestCall();
+						if (!this.peerActive) {
+							console.info('Not in a call and peer not ready, preparing peer');
+							if (this.peerDisconnected && !this.peerDestroyed) this.peer.reconnect();
+							else this._createPeer();
+						}
+						else if (this.calls) {
+							console.info('Not in a call and need to call someone, calling...');
+							this._performCall(this.calls);
+						}
+						else if (this.spectates) {
+							console.info('Not in a call and should be spectating, requesting call');
+							this._requestCall();
+						}
 						else console.info('_main(): waiting for connections...')
 					}
-					else if (this.peerActive) this.peer.destroy();
+					else if (this.peer) {
+						if (!this.peerDisconnected) {
+							// Crucial step. PeerJS will close all media connections
+							// if the peer's connection to the server dies.
+							// This default behavior is undesirable, there should be
+							// no need to end streams even if the server hiccups.
+							console.info('Already in a call, disconnecting peer as its not needed');
+							this.peer.disconnect();
+						}
+						else console.info('Peer not needed and was already disconnected');
+					}
+					else console.warn('This should not happen, in a call but have no peer reference');
 				}
 				else console.info('_main(): No work needed, no tasks declared.')
 			},
 
-			_mainDelayed: function () {
+			_mainDelayed: function() {
 				if (this._queuedMain) return;
 				this._queuedMain = setTimeout(function () {
 					this._queuedMain = null;
@@ -197,7 +225,7 @@
 				}.bind(this), this._timeout);
 			},
 
-			_createPeer: function () {
+			_createPeer: function() {
 				var peerOpts = {debug: 3};
 				if (this.key) peerOpts.key = this.key;
 				else {
@@ -212,12 +240,12 @@
 				this.peer.on('connection', this._handleConnection.bind(this));
 			},
 
-			_handlePeerOpen: function (id) {
+			_handlePeerOpen: function(id) {
 				this.self = id;
-				this._main(); // Job here is done.
+				this._main();
 			},
 
-			_handlePeerError: function (error) {
+			_handlePeerError: function(error) {
 				if (error.type === 'peer-unavailable') {
 					// Non fatal error, give back control.
 					this._mainDelayed();
@@ -232,31 +260,33 @@
 			_handleConnection: function(conn) {
 				if (this.broadcasts) {
 					if (conn.metadata === 'call-request') {
-						if (!this.inCall) {
-							if (this.haveLocalStream) {
-								this.peer.call(conn.peer, this._localStream)
-							}
-							else console.warn('Would have responded to call request but no stream is available');
-						}
-						else console.warn('Already in a call, ignoring call-request');
+						this._handleCallRequest(conn.peer);
 					}
 				}
 			},
 
-			_performCall: function () {
-				if (!this.haveLocalStream) {
-					console.warn('Want to call, but no stream was provided');
+			_performCall: function(remote) {
+				if (this.haveLocalStream) {
+					this._call = this.peer.call(remote, this._localStream);
+					//this._call.on('open', this._main.bind(this)); Calls have no open event?!
+					this._call.on('close', this._handleCallEnd.bind(this));
+					this._call.on('error', this._handleCallEnd.bind(this));
+
+					// this._main(); TODO: why doesn't this work?
 					this._mainDelayed();
 				}
 				else {
-					this._call = this.peer.call(this.calls, this._localStream);
-					this._call.on('open', this._main());
-					this._call.on('close', this._handleCallEnd.bind(this));
-					this._call.on('error', this._handleCallEnd.bind(this));
+					console.warn('Want to call, but no stream is available');
+					this._mainDelayed();
 				}
 			},
 
-			_requestCall: function () {
+			_handleCallRequest: function(remote) {
+				if (!this.inCall) this._performCall(remote);
+				else console.warn('Already in a call, ignoring call-request');
+			},
+
+			_requestCall: function() {
 				var pps = this;
 				var successful = false;
 				var conn = this.peer.connect(this.spectates, {
@@ -265,6 +295,7 @@
 				});
 				conn.on('open', function () {
 					successful = true;
+					console.info('Closing unnecessary data connection');
 					conn.close(); // Not needed anymore, request was sent.
 
 					// Now it's up to the broadcaster to call us back.
@@ -275,25 +306,28 @@
 				conn.on('error', requestFailure);
 				function requestFailure() {
 					if (!successful) {
-						console.warn('call request failed');
+						console.warn('Call request failed');
 						pps._mainDelayed();
 					}
 				}
 			},
 
-			_handleCall: function (call) {
+			_handleCall: function(call) {
 				if (this.inCall) return; // One at a time please.
 				if (call.peer !== this.spectates && !this.answers) return;
 
 				this._call = call;
 				this.haveLocalStream ? call.answer(this._localStream) : call.answer();
-				call.on('stream', this._handleStream.bind(this));
-				call.on('close', this._handleCallEnd.bind(this));
-				call.on('error', this._handleCallEnd.bind(this));
+				this._call.on('stream', this._handleStream.bind(this));
+				this._call.on('close', this._handleCallEnd.bind(this));
+				this._call.on('error', this._handleCallEnd.bind(this));
+
+				//this._main(); // breaks!
+				this._mainDelayed(); // TODO: why does this work but not previous?
 			},
 
 			_handleCallEnd: function(e) {
-				console.warn('call ended', e);
+				console.warn('call ended, closing just to make sure', e);
 				this._call.close(); // Making sure it's destroyed.
 				this._call = null;
 				this._mainDelayed();
@@ -314,7 +348,8 @@
 				console.warn('stream ended, reconnecting...');
 
 				if (this._call) {
-					this._call.close(); // Probably unnecessary
+					if (this._call.open) console.warn('Stream ended but call is active, closing call anyways');
+					this._call.close(); // Just to be safe
 					this._call = null;
 				}
 				this._mainDelayed();
