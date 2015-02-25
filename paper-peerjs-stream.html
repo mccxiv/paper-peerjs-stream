@@ -48,7 +48,7 @@
 
 		'use strict';
 
-		//noinspection JSValidateTypes, JSUnusedGlobalSymbols
+		//noinspection JSValidateTypes, JSUnusedGlobalSymbols, JSValidateJSDoc
 
 		Polymer({
 			publish: {
@@ -161,19 +161,21 @@
 				haveRemoteStream: '_remoteStream && !_remoteStream.ended'
 			},
 
-			peer : undefined,         // PeerJS instance, will change throughout lifecycle
-			_call: null,              // The current call
-			_timeout: 3000,           // Wait this long between attempts
-			_attached : false,        //
-			_localStream: null,       // Stream that will be sent
-			_remoteStream: null,      // Stream received from call
-			_remoteStreamURL: null,   // Stream in url form, for src
-			_queuedMain: 0,           // To prevent multiple operations
+			peer : undefined,             // PeerJS instance, will change throughout lifecycle
+			_call: undefined,             // The current call
+			_timeout: 3000,               // Wait this long between attempts
+			_attached : false,            //
+			_localStream: undefined,      // Stream that will be sent
+			_remoteStream: undefined,     // Stream received from call
+			_remoteStreamURL: undefined,  // Stream in url form, for src
+			_queuedMain: 0,               // To prevent multiple operations
 
 			/**
-			 * Provide a stream.
+			 * Provide a stream for use in calls.
 			 * Some actions won't work until a stream is provided with this method.
+			 *
 			 * @public
+			 * @param {MediaStream} stream
 			 */
 			setStream: function(stream) {
 				this._localStream = stream;
