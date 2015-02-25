@@ -202,11 +202,15 @@
 
 				if (!this.isAttached) {
 					// Should not be active unless attached to the DOM
-					if (this.peer) this.peer.destroy();
+					console.info('Not attached to the DOM, aborting operations');
+					if (this.peer) {
+						console.info('Destroying peer');
+						this.peer.destroy();
+					}
 					return;
 				}
 
-				console.log('_main(): checking what needs to be done');
+				console.log('Checking what needs to be done');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this.inCall) {
 						if (!this.peerActive) {
@@ -222,7 +226,7 @@
 							console.info('Not in a call and should be spectating, requesting call');
 							this._requestCall();
 						}
-						else console.info('_main(): waiting for connections...')
+						else console.info('Waiting for connections...')
 					}
 					else if (this.peer) {
 						if (!this.peerDisconnected) {
@@ -237,7 +241,7 @@
 					}
 					else console.warn('This should not happen, in a call but have no peer reference');
 				}
-				else console.info('_main(): No work needed, no tasks declared.')
+				else console.info('No work needed, no tasks declared.')
 			},
 
 			_mainDelayed: function() {
@@ -265,6 +269,7 @@
 
 			_handlePeerOpen: function(id) {
 				this.self = id;
+				this.fire('id', id);
 				this._main();
 			},
 
@@ -291,7 +296,6 @@
 			_performCall: function(remote) {
 				if (this.haveLocalStream) {
 					this._call = this.peer.call(remote, this._localStream);
-					//this._call.on('open', this._main.bind(this)); Calls have no open event?!
 					this._call.on('close', this._handleCallEnd.bind(this));
 					this._call.on('error', this._handleCallEnd.bind(this));
 
