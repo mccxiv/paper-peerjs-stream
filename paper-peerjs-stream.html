@@ -153,6 +153,7 @@
 
 			computed: {
 				inCall: '!!_call',
+				isAttached: '!!parentNode',
 				peerActive: 'peer && !peer.destroyed && !peer.disconnected',
 				peerDestroyed: 'peer && peer.destroyed',
 				peerDisconnected: 'peer && peer.disconnected',
@@ -163,19 +164,34 @@
 			peer : undefined,         // PeerJS instance, will change throughout lifecycle
 			_call: null,              // The current call
 			_timeout: 3000,           // Wait this long between attempts
+			_attached : false,        //
 			_localStream: null,       // Stream that will be sent
 			_remoteStream: null,      // Stream received from call
 			_remoteStreamURL: null,   // Stream in url form, for src
 			_queuedMain: 0,           // To prevent multiple operations
 
+			/**
+			 * Provide a stream.
+			 * Some actions won't work until a stream is provided with this method.
+			 * @public
+			 */
 			setStream: function(stream) {
 				this._localStream = stream;
 				this._main();
 			},
 
-			ready: function() {
-				window.pps = this; // Debug
+			attached: function() {
+				console.info('ready');
 				this._main();
+			},
+
+			detached: function() {
+				console.info('detached');
+				if (this.peer) this.peer.destroy();
+			},
+
+			domReady: function() {
+				console.info('domReady');
 			},
 
 			/**
@@ -183,6 +199,13 @@
 			 * Should run once an operation finishes and on certain events
 			 */
 			_main: function() {
+
+				if (!this.isAttached) {
+					// Should not be active unless attached to the DOM
+					if (this.peer) this.peer.destroy();
+					return;
+				}
+
 				console.log('_main(): checking what needs to be done');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this.inCall) {
