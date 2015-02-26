@@ -148,7 +148,17 @@
 				 * @type boolean
 				 * @default false
 				 */
-				answers: {value: false, reflect: true}
+				answers: {value: false, reflect: true},
+
+				/**
+				 * If true, calls .start() when attached to the DOM.
+				 * If false, will need to call .start() yourself.
+				 *
+				 * @attribute autostart
+				 * @type boolean
+				 * @default false
+				 */
+				autostart: {value: false, reflect: true}
 			},
 
 			computed: {
@@ -161,10 +171,11 @@
 				haveRemoteStream: '_remoteStream && !_remoteStream.ended'
 			},
 
-			peer : undefined,             // PeerJS instance, will change throughout lifecycle
+			peer : undefined,    // PeerJS instance, will change throughout lifecycle
+
 			_call: undefined,             // The current call
+			_active: false,               // Determines if _main() should do stuff
 			_timeout: 3000,               // Wait this long between attempts
-			_attached : false,            //
 			_localStream: undefined,      // Stream that will be sent
 			_remoteStream: undefined,     // Stream received from call
 			_remoteStreamURL: undefined,  // Stream in url form, for src
@@ -182,14 +193,37 @@
 				this._main();
 			},
 
+			/**
+			 * Starts network activity.
+			 * Other parameters (e.g. setStream()) may still need
+			 * to be provided before useful work can be done.
+			 *
+			 * Declarative attribute equivalent: autostart
+			 *
+			 * @public
+			 */
+			start: function() {
+				this._active = true;
+				this._main();
+			},
+
+			stop: function() {
+				this._active = false;
+				this._main();
+			},
+
+			/**
+			 * Lifecycle handlers
+			 */
 			attached: function() {
 				console.info('ready');
-				this._main();
+				if (this.autostart) this.start();
+				else this._main();
 			},
 
 			detached: function() {
 				console.info('detached');
-				if (this.peer) this.peer.destroy();
+				this.stop();
 			},
 
 			domReady: function() {
@@ -198,17 +232,13 @@
 
 			/**
 			 * Main program logic.
-			 * Should run once an operation finishes and on certain events
+			 * Should run when an operation finishes and on certain events
 			 */
 			_main: function() {
 
-				if (!this.isAttached) {
-					// Should not be active unless attached to the DOM
-					console.info('Not attached to the DOM, aborting operations');
-					if (this.peer) {
-						console.info('Destroying peer');
-						this.peer.destroy();
-					}
+				if (!this._active || !this.isAttached) {
+					console.log('Not active or not attached to DOM, aborting.');
+					this._destroyPeer();
 					return;
 				}
 
@@ -236,7 +266,7 @@
 							// if the peer's connection to the server dies.
 							// This default behavior is undesirable, there should be
 							// no need to end streams even if the server hiccups.
-							console.info('Already in a call, disconnecting peer as its not needed');
+							console.info('Already in a call, disconnecting peer as it\'s not needed');
 							this.peer.disconnect();
 						}
 						else console.info('Peer not needed and was already disconnected');
@@ -267,6 +297,10 @@
 				this.peer.on('error', this._handlePeerError.bind(this));
 				this.peer.on('call', this._handleCall.bind(this));
 				this.peer.on('connection', this._handleConnection.bind(this));
+			},
+
+			_destroyPeer: function() {
+				if (this.peer) this.peer.destroy();
 			},
 
 			_handlePeerOpen: function(id) {
