@@ -226,7 +226,8 @@
 				this.stop();
 			},
 
-			domReady: function() {
+			ready: function() {
+				window.pps = this; // debug
 				console.info('domReady');
 			},
 
@@ -238,6 +239,7 @@
 
 				if (!this._active || !this.isAttached) {
 					console.log('Not active or not attached to DOM, aborting.');
+					console.info('Destroying peer, this should end call, did it?');
 					this._destroyPeer();
 					return;
 				}
@@ -420,7 +422,7 @@
 
 			_handlePlaying: function(e, detail, sender) {
 				//noinspection JSUnresolvedFunction
-				sender.animate([
+				window.player = sender.animate([
 						{opacity: 0, transform: 'scale3d(.3, .3, .3)'},
 					 	{opacity: 1, transform: 'none'}],
 					{duration: 500, easing: 'cubic-bezier(.55, 0, .1, 1)'}
