@@ -36,11 +36,8 @@
 		</style>
 
 		<div class="main">
-			<video src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
-
-			<template if="{{!haveRemoteStream}}">
-				<paper-spinner active></paper-spinner>
-			</template>
+			<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
+			<paper-spinner id="spinner" active></paper-spinner>
 		</div>
 	</template>
 
@@ -181,6 +178,8 @@
 			_remoteStreamURL: undefined,  // Stream in url form, for src
 			_queuedMain: 0,               // To prevent multiple operations
 
+			_swiftOut: 'cubic-bezier(.55, 0, .1, 1)',  // Easing for use in animations
+
 			/**
 			 * Provide a stream for use in calls.
 			 * Some actions won't work until a stream is provided with this method.
@@ -232,6 +231,14 @@
 			},
 
 			/**
+			 * Observers?! SO COOL
+			 */
+			haveRemoteStreamChanged: function(oldVal, newVal) {
+				if (newVal) this._uiHideSpinner();
+				else this._uiShowSpinner();
+			},
+
+			/**
 			 * Main program logic.
 			 * Should run when an operation finishes and on certain events
 			 */
@@ -271,7 +278,10 @@
 							console.info('Already in a call, disconnecting peer as it\'s not needed');
 							this.peer.disconnect();
 						}
-						else console.info('Peer not needed and was already disconnected');
+						else {
+							// Call exists, peer is disconnected.
+							console.info('Peer not needed and was already disconnected');
+						}
 					}
 					else console.warn('This should not happen, in a call but have no peer reference');
 				}
@@ -303,6 +313,15 @@
 
 			_destroyPeer: function() {
 				if (this.peer) this.peer.destroy();
+
+				// Handle edge cases where the peer was destroyed
+				// between the moment a call was initiated and answered
+				if (this._call) {
+					console.warn('Peer destroyed but there\'s still a call');
+					if (this._call.open) console.warn('Peer destroyed but the call is still open!');
+					this._call.close();
+					this._call = null;
+				}
 			},
 
 			_handlePeerOpen: function(id) {
@@ -417,16 +436,56 @@
 					this._call.close(); // Just to be safe
 					this._call = null;
 				}
+				this._uiHandleStreamEnd();
 				this._mainDelayed();
 			},
 
-			_handlePlaying: function(e, detail, sender) {
-				//noinspection JSUnresolvedFunction
-				window.player = sender.animate([
-						{opacity: 0, transform: 'scale3d(.3, .3, .3)'},
-					 	{opacity: 1, transform: 'none'}],
-					{duration: 500, easing: 'cubic-bezier(.55, 0, .1, 1)'}
-				);
+			_handlePlaying: function() {
+				this._uiHandleStreamStart()
+			},
+
+			/* UI handlers */
+
+			_uiHandleStreamStart: function() {
+				this._uiHideSpinner();
+				this._uiShowVideo();
+			},
+
+			_uiHandleStreamEnd: function() {
+				this._uiShowSpinner();
+				this._uiHideVideo();
+			},
+
+			_uiShowSpinner: function() {
+				var from =  {display: 'block', opacity: 0};
+				var to =    {opacity: 1};
+				var opts =  {duration: 500, easing: this._swiftOut};
+
+				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
+				this.$.spinner.animate([from, to], opts);
+			},
+
+			_uiHideSpinner: function() {
+				var from =  {opacity: 1};
+				var to =    {opacity: 0, display: 'hidden'};
+				var opts =  {duration: 500, easing: this._swiftOut};
+
+				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
+				this.$.spinner.animate([from, to], opts);
+			},
+
+			_uiShowVideo: function() {
+				var from =  {opacity: 0, transform: 'scale3d(.3, .3, .3)'};
+				var to =    {opacity: 1, transform: 'none'};
+				var opts =  {duration: 500, easing: this._swiftOut};
+
+				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
+				window.player = sender.animate([from, to], opts);
+
+			},
+
+			_uiHideVideo: function() {
+				// should already be black, that's fine
 			}
 		});
 	</script>
