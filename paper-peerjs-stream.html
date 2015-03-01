@@ -11,7 +11,7 @@
 		<link rel="stylesheet" href="paper-peerjs-stream.css">
 		<div class="main" horizontal center-justified layout>
 			<div id="videobox">
-				<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
+				<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay></video>
 				<paper-spinner id="spinner" active></paper-spinner>
 				<div id="toolbar">
 					<paper-slider id="volume" value="{{_volume}}" on-immediate-value-change="{{_volumeChange}}"></paper-slider>
