@@ -1,43 +1,22 @@
-<!--suppress HtmlUnknownTarget -->
+<!--suppress ALL -->
 
 <link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../paper-slider/paper-slider.html">
 <link rel="import" href="../paper-spinner/paper-spinner.html">
 
 <script src="../peerjs/peer.js"></script> <!-- TODO: use min, use import maybe? -->
 
 <polymer-element name="paper-peerjs-stream">
-
 	<template>
-		<style>
-			:host {
-				min-height: 100px;
-				display: block;
-				position: relative;
-				background-color: black;
-			}
-
-			video {
-				height: 100%;
-				display: block;
-				margin: 0 auto;
-			}
-
-			paper-spinner {
-				width: 86px;
-				height: 86px;
-				position: absolute;
-				top: calc(50% - 43px);
-				left: calc(50% - 43px);
-			}
-
-			paper-spinner::shadow .circle {
-				border-width: 8px;
-			}
-		</style>
-
-		<div class="main">
-			<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
-			<paper-spinner id="spinner" active></paper-spinner>
+		<link rel="stylesheet" href="paper-peerjs-stream.css">
+		<div class="main" horizontal center-justified layout>
+			<div id="videobox">
+				<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay muted></video>
+				<paper-spinner id="spinner" active></paper-spinner>
+				<div id="toolbar">
+					<paper-slider id="volume" value="{{_volume}}" on-immediate-value-change="{{_volumeChange}}"></paper-slider>
+				</div>
+			</div>
 		</div>
 	</template>
 
@@ -46,7 +25,6 @@
 		'use strict';
 
 		//noinspection JSValidateTypes, JSUnusedGlobalSymbols, JSValidateJSDoc
-
 		Polymer({
 			publish: {
 
@@ -155,17 +133,27 @@
 				 * @type boolean
 				 * @default false
 				 */
-				autostart: {value: false, reflect: true}
+				autostart: {value: false, reflect: true},
+
+				/**
+				 * Css color to use for UI elements like the volume control.
+				 * May also be set via styles instead of using this attribute.
+				 *
+				 * @attribute color
+				 * @type string
+				 * @default '#FF5722' - Deep Orange google.com/design/spec/style/color.html
+				 */
+				color: '#FF5722'
 			},
 
 			computed: {
-				inCall: '!!_call',
-				isAttached: '!!parentNode',
-				peerActive: 'peer && !peer.destroyed && !peer.disconnected',
-				peerDestroyed: 'peer && peer.destroyed',
-				peerDisconnected: 'peer && peer.disconnected',
-				haveLocalStream: '_localStream && !_localStream.ended',
-				haveRemoteStream: '_remoteStream && !_remoteStream.ended'
+				_inCall: '!!_call',
+				_isAttached: '!!parentNode',
+				_peerActive: 'peer && !peer.destroyed && !peer.disconnected',
+				_peerDestroyed: 'peer && peer.destroyed',
+				_peerDisconnected: 'peer && peer.disconnected',
+				_haveLocalStream: '_localStream && !_localStream.ended',
+				_haveRemoteStream: '_remoteStream && !_remoteStream.ended'
 			},
 
 			peer : undefined,    // PeerJS instance, will change throughout lifecycle
@@ -175,10 +163,11 @@
 			_timeout: 3000,               // Wait this long between attempts
 			_localStream: undefined,      // Stream that will be sent
 			_remoteStream: undefined,     // Stream received from call
+			_volume: 75,           // Volume of the stream
 			_remoteStreamURL: undefined,  // Stream in url form, for src
 			_queuedMain: 0,               // To prevent multiple operations
 
-			_swiftOut: 'cubic-bezier(.55, 0, .1, 1)',  // Easing for use in animations
+			_easing: 'cubic-bezier(.55, 0, .1, 1)',  // Easing for use in animations
 
 			/**
 			 * Provide a stream for use in calls.
@@ -233,7 +222,7 @@
 			/**
 			 * Observers?! SO COOL
 			 */
-			haveRemoteStreamChanged: function(oldVal, newVal) {
+			_haveRemoteStreamChanged: function(oldVal, newVal) {
 				if (newVal) this._uiHideSpinner();
 				else this._uiShowSpinner();
 			},
@@ -244,7 +233,7 @@
 			 */
 			_main: function() {
 
-				if (!this._active || !this.isAttached) {
+				if (!this._active || !this._isAttached) {
 					console.log('Not active or not attached to DOM, aborting.');
 					console.info('Destroying peer, this should end call, did it?');
 					this._destroyPeer();
@@ -253,10 +242,10 @@
 
 				console.log('Checking what needs to be done');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
-					if (!this.inCall) {
-						if (!this.peerActive) {
+					if (!this._inCall) {
+						if (!this._peerActive) {
 							console.info('Not in a call and peer not ready, preparing peer');
-							if (this.peerDisconnected && !this.peerDestroyed) this.peer.reconnect();
+							if (this._peerDisconnected && !this._peerDestroyed) this.peer.reconnect();
 							else this._createPeer();
 						}
 						else if (this.calls) {
@@ -270,7 +259,7 @@
 						else console.info('Waiting for connections...')
 					}
 					else if (this.peer) {
-						if (!this.peerDisconnected) {
+						if (!this._peerDisconnected) {
 							// Crucial step. PeerJS will close all media connections
 							// if the peer's connection to the server dies.
 							// This default behavior is undesirable, there should be
@@ -351,7 +340,7 @@
 			},
 
 			_performCall: function(remote) {
-				if (this.haveLocalStream) {
+				if (this._haveLocalStream) {
 					this._call = this.peer.call(remote, this._localStream);
 					this._call.on('close', this._handleCallEnd.bind(this));
 					this._call.on('error', this._handleCallEnd.bind(this));
@@ -366,7 +355,7 @@
 			},
 
 			_handleCallRequest: function(remote) {
-				if (!this.inCall) this._performCall(remote);
+				if (!this._inCall) this._performCall(remote);
 				else console.warn('Already in a call, ignoring call-request');
 			},
 
@@ -397,11 +386,11 @@
 			},
 
 			_handleCall: function(call) {
-				if (this.inCall) return; // One at a time please.
+				if (this._inCall) return; // One at a time please.
 				if (call.peer !== this.spectates && !this.answers) return;
 
 				this._call = call;
-				this.haveLocalStream ? call.answer(this._localStream) : call.answer();
+				this._haveLocalStream ? call.answer(this._localStream) : call.answer();
 				this._call.on('stream', this._handleStream.bind(this));
 				this._call.on('close', this._handleCallEnd.bind(this));
 				this._call.on('error', this._handleCallEnd.bind(this));
@@ -453,39 +442,52 @@
 
 			_uiHandleStreamEnd: function() {
 				this._uiShowSpinner();
-				this._uiHideVideo();
+				//this._uiHideVideo();
 			},
 
 			_uiShowSpinner: function() {
-				var from =  {display: 'block', opacity: 0};
+				//noinspection JSUnresolvedVariable
+				var spinner = this.$.spinner;
+				var from =  {opacity: 0};
 				var to =    {opacity: 1};
-				var opts =  {duration: 500, easing: this._swiftOut};
+				var opts =  {duration: 5000, easing: this._easing};
 
-				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
-				this.$.spinner.animate([from, to], opts);
+				spinner.setAttribute('active', true);
+				spinner.style.display = 'inline-block';
+
+				//noinspection JSUnresolvedFunction
+				spinner.animate([from, to], opts);
 			},
 
 			_uiHideSpinner: function() {
+				//noinspection JSUnresolvedVariable
+				var spinner = this.$.spinner;
 				var from =  {opacity: 1};
-				var to =    {opacity: 0, display: 'hidden'};
-				var opts =  {duration: 500, easing: this._swiftOut};
+				var to =    {opacity: 0};
+				var opts =  {duration: 500, easing: this._easing};
 
-				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
-				this.$.spinner.animate([from, to], opts);
+				//noinspection JSUnresolvedFunction
+				var anim = spinner.animate([from, to], opts);
+
+
+				anim.addEventListener('finish', function() {
+					spinner.removeAttribute('active');
+					spinner.style.display = 'none';
+				}.bind(this));
 			},
 
 			_uiShowVideo: function() {
 				var from =  {opacity: 0, transform: 'scale3d(.3, .3, .3)'};
 				var to =    {opacity: 1, transform: 'none'};
-				var opts =  {duration: 500, easing: this._swiftOut};
+				var opts =  {duration: 500, easing: this._easing};
 
 				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
 				window.player = this.$.video.animate([from, to], opts);
-
 			},
 
-			_uiHideVideo: function() {
-				// should already be black, that's fine
+			_volumeChange: function(e) {
+				console.info('volume changed', e);
+				this.$.video.volume = this.$.volume.immediateValue / 100;
 			}
 		});
 	</script>

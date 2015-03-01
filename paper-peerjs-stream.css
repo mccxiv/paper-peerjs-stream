@@ -1,0 +1,53 @@
+:host {
+	min-height: 100px;
+	display: block;
+	position: relative;
+	background-color: black;
+}
+
+#videobox {
+	position: relative;
+	float: left;
+}
+
+#video {
+	height: 100%;
+	display: block; /* get rid of whitespace */
+}
+
+#spinner {
+	width: 86px;
+	height: 86px;
+	position: absolute;
+	top: calc(50% - 43px);
+	left: calc(50% - 43px);
+}
+
+#spinner::shadow .circle {
+	border-width: 8px;
+}
+
+#toolbar {
+	position: absolute;
+	bottom: 0;
+	right: 0;
+}
+
+#volume {
+	width: 100px;
+	opacity: 0;
+	transition: opacity 300ms {{_easing}};
+}
+
+:host(:hover) #volume {
+	opacity: 1;
+}
+
+#volume::shadow #sliderBar::shadow #activeProgress {
+	background-color: inherit;
+}
+
+#volume /deep/ #sliderKnobInner,
+#volume /deep/ #progressContainer {
+	background-color: {{color}};
+}
