@@ -220,28 +220,28 @@
 			_main: function() {
 
 				if (!this.active) {
-					console.info('Not active or not attached to DOM, aborting.');
+					console.info('PPS: Not active or not attached to DOM, aborting.');
 					this._destroyPeer();
 					return;
 				}
 
-				console.info('Checking what needs to be done');
+				console.info('PPS: Checking what needs to be done');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this._inCall) {
 						if (!this._peerActive) {
-							console.info('Not in a call and peer not ready, preparing peer');
+							console.info('PPS: Not in a call and peer not ready, preparing peer');
 							if (this._peerDisconnected && !this._peerDestroyed) this.peer.reconnect();
 							else this._createPeer();
 						}
 						else if (this.calls) {
-							console.info('Not in a call and need to call someone, calling...');
+							console.info('PPS: Not in a call and need to call someone, calling...');
 							this._performCall(this.calls);
 						}
 						else if (this.spectates) {
-							console.info('Not in a call and should be spectating, requesting call');
+							console.info('PPS: Not in a call and should be spectating, requesting call');
 							this._requestCall();
 						}
-						else console.info('Waiting for connections...')
+						else console.info('PPS: Waiting for connections...')
 					}
 					else if (this.peer) {
 						if (!this._peerDisconnected) {
@@ -249,17 +249,17 @@
 							// if the peer's connection to the server dies.
 							// This default behavior is undesirable, there should be
 							// no need to end streams even if the server hiccups.
-							console.info('Already in a call, disconnecting peer as it\'s not needed');
+							console.info('PPS: Already in a call, disconnecting peer as it\'s not needed');
 							this.peer.disconnect();
 						}
 						else {
 							// Call exists, peer is disconnected.
-							console.info('Peer not needed and was already disconnected');
+							console.info('PPS: Peer not needed and was already disconnected');
 						}
 					}
-					else console.warn('This should not happen, in a call but have no peer reference');
+					else console.warn('PPS: This should not happen, in a call but have no peer reference');
 				}
-				else console.info('No work needed, no tasks declared.')
+				else console.info('PPS: No work needed, no tasks declared.')
 			},
 
 			_mainDelayed: function() {
@@ -287,15 +287,15 @@
 
 			_destroyPeer: function() {
 				if (this.peer) {
-					console.info('Destroying peer, this should end calls if any.');
+					console.info('PPS: Destroying peer, this should end calls if any.');
 					this.peer.destroy();
 				}
 
 				// Handle edge cases where the peer was destroyed
 				// between the moment a call was initiated and answered
 				if (this._call) {
-					console.warn('Peer destroyed but there\'s still a call.');
-					if (this._call.open) console.warn('Peer destroyed but the call is still open!');
+					console.warn('PPS: Peer destroyed but there\'s still a call.');
+					if (this._call.open) console.warn('PPS: Peer destroyed but the call is still open!');
 					this._call.close();
 					this._call = null;
 				}
@@ -337,14 +337,14 @@
 					this._mainDelayed();
 				}
 				else {
-					console.warn('Want to call, but no stream is available');
+					console.warn('PPS: Want to call, but no stream is available');
 					this._mainDelayed();
 				}
 			},
 
 			_handleCallRequest: function(remote) {
 				if (!this._inCall) this._performCall(remote);
-				else console.warn('Already in a call, ignoring call-request');
+				else console.warn('PPS: Already in a call, ignoring call-request');
 			},
 
 			_requestCall: function() {
@@ -356,7 +356,7 @@
 				});
 				conn.on('open', function () {
 					successful = true;
-					console.info('Closing unnecessary data connection');
+					console.info('PPS: Closing unnecessary data connection');
 					conn.close(); // Not needed anymore, request was sent.
 
 					// Now it's up to the broadcaster to call us back.
@@ -367,7 +367,7 @@
 				conn.on('error', requestFailure);
 				function requestFailure() {
 					if (!successful) {
-						console.warn('Call request failed');
+						console.warn('PPS: Call request failed');
 						pps._mainDelayed();
 					}
 				}
@@ -388,7 +388,7 @@
 			},
 
 			_handleCallEnd: function(e) {
-				console.warn('call ended, closing just to make sure');
+				console.warn('PPS: call ended, closing just to make sure');
 				this._call.close(); // Making sure it's destroyed.
 				this._call = null;
 				this._mainDelayed();
@@ -406,10 +406,10 @@
 				// TODO: ??
 				// Consider a different approach. Can a stream come back
 				// using the same call?
-				console.warn('stream ended, reconnecting...');
+				console.warn('PPS: stream ended, reconnecting...');
 
 				if (this._call) {
-					if (this._call.open) console.warn('Stream ended but call is active, closing call anyways');
+					if (this._call.open) console.warn('PPS: Stream ended but call is active, closing call anyways');
 					this._call.close(); // Just to be safe
 					this._call = null;
 				}
