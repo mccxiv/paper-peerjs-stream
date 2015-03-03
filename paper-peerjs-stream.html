@@ -217,7 +217,6 @@
 
 				if (!this.active) {
 					console.log('Not active or not attached to DOM, aborting.');
-					console.info('Destroying peer, this should end call, did it?');
 					this._destroyPeer();
 					return;
 				}
@@ -283,12 +282,15 @@
 			},
 
 			_destroyPeer: function() {
-				if (this.peer) this.peer.destroy();
+				if (this.peer) {
+					console.info('Destroying peer, this should end calls if any.');
+					this.peer.destroy();
+				}
 
 				// Handle edge cases where the peer was destroyed
 				// between the moment a call was initiated and answered
 				if (this._call) {
-					console.warn('Peer destroyed but there\'s still a call');
+					console.warn('Peer destroyed but there\'s still a call.');
 					if (this._call.open) console.warn('Peer destroyed but the call is still open!');
 					this._call.close();
 					this._call = null;
