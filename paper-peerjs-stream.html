@@ -12,7 +12,7 @@
 		<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay></video>
 		<paper-spinner id="spinner" active></paper-spinner>
 		<div id="toolbar">
-			<paper-slider id="volume" value="{{_volume}}" on-immediate-value-change="{{_volumeChange}}"></paper-slider>
+			<paper-slider id="volume" value="[[volume]]" on-immediate-value-change="{{_volumeSliderChange}}" min="0" max="1" step="0.01"></paper-slider>
 		</div>
 	</template>
 
@@ -121,14 +121,24 @@
 				answers: {value: false, reflect: true},
 
 				/**
-				 * If true, calls .start() when attached to the DOM.
-				 * If false, you will need to call .start() yourself.
+				 * If true, the element will not wait for .start()
+				 * Also causes the element to start and stop when
+				 * this attribute is dynamically changed
 				 *
-				 * @attribute autostart
+				 * @attribute active
 				 * @type boolean
 				 * @default false
 				 */
-				autostart: {value: false, reflect: true},
+				active: {value: false, reflect: true},
+
+				/**
+				 * Volume of the incoming stream, from 0 to 1
+				 *
+				 * @attribute volume
+				 * @type number
+				 * @default 0.75
+				 */
+				volume: {value: 0.75, reflect: true},
 
 				/**
 				 * Css color to use for UI elements like the volume control.
@@ -154,11 +164,9 @@
 			peer : undefined,    // PeerJS instance, will change throughout lifecycle
 
 			_call: undefined,             // The current call
-			_active: false,               // Determines if _main() should do stuff
 			_timeout: 3000,               // Wait this long between attempts
 			_localStream: undefined,      // Stream that will be sent
 			_remoteStream: undefined,     // Stream received from call
-			_volume: 75,           // Volume of the stream
 			_remoteStreamURL: undefined,  // Stream in url form, for src
 			_queuedMain: 0,               // To prevent multiple operations
 
@@ -177,41 +185,10 @@
 			},
 
 			/**
-			 * Starts network activity.
-			 * Other parameters (e.g. setStream()) may still need
-			 * to be provided before useful work can be done.
-			 *
-			 * Declarative attribute equivalent: autostart
-			 *
-			 * @public
-			 */
-			start: function() {
-				this._active = true;
-				this.fire('start');
-				this._main();
-			},
-
-			stop: function() {
-				this._active = false;
-				this.fire('stop');
-				this._main();
-			},
-
-			/**
 			 * Lifecycle handlers
 			 */
-			attached: function() {
-				if (this.autostart) this.start();
-				else this._main();
-			},
-
-			detached: function() {
-				this.stop();
-			},
-
-			ready: function() {
-				window.pps = this; // debug
-			},
+			ready: function() {this._main();},
+			attributeChanged: function() {this._main();},
 
 			/**
 			 * Observers?! SO COOL
@@ -227,13 +204,18 @@
 				}
 			},
 
-			/**
+			volumeChanged: function() {
+				this.$.video.volume = this.volume;
+				// update slider? No, it bugs out
+			},
+
+		/**
 			 * Main program logic.
 			 * Should run when an operation finishes and on certain events
 			 */
 			_main: function() {
 
-				if (!this._active || !this._isAttached) {
+				if (!this.active) {
 					console.log('Not active or not attached to DOM, aborting.');
 					console.info('Destroying peer, this should end call, did it?');
 					this._destroyPeer();
@@ -485,9 +467,8 @@
 				window.player = this.$.video.animate([from, to], opts);
 			},
 
-			_volumeChange: function(e) {
-				console.info('volume changed', e);
-				this.$.video.volume = this.$.volume.immediateValue / 100;
+			_volumeSliderChange: function() {
+				this.volume = this.$.volume.immediateValue;
 			}
 		});
 	</script>
