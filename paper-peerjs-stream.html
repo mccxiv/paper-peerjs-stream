@@ -216,12 +216,12 @@
 			_main: function() {
 
 				if (!this.active) {
-					console.log('Not active or not attached to DOM, aborting.');
+					console.info('Not active or not attached to DOM, aborting.');
 					this._destroyPeer();
 					return;
 				}
 
-				console.log('Checking what needs to be done');
+				console.info('Checking what needs to be done');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this._inCall) {
 						if (!this._peerActive) {
