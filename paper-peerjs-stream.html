@@ -188,7 +188,7 @@
 			 * Lifecycle handlers
 			 */
 			ready: function() {this._main();},
-			attributeChanged: function() {this._main();},
+
 
 			/**
 			 * Observers?! SO COOL
@@ -202,6 +202,10 @@
 					this._uiShowSpinner();
 					this.fire('remote-stream-end')
 				}
+			},
+
+			attributeChanged: function(attribute) {
+				if (attribute !== 'volume')	this._main();
 			},
 
 			volumeChanged: function() {
