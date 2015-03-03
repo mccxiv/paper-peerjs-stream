@@ -9,11 +9,13 @@
 <polymer-element name="paper-peerjs-stream">
 	<template>
 		<link rel="stylesheet" href="paper-peerjs-stream.css">
-		<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay></video>
-		<paper-spinner id="spinner" active></paper-spinner>
-		<div id="toolbar">
-			<paper-slider id="volume" value="[[volume]]" on-immediate-value-change="{{_volumeSliderChange}}" min="0" max="1" step="0.01"></paper-slider>
-		</div>
+		<!--<div id="wrapper" layout vertical>-->
+			<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay></video>
+			<paper-spinner id="spinner" active></paper-spinner>
+			<div id="toolbar">
+				<paper-slider id="volume" value="[[volume]]" on-immediate-value-change="{{_volumeSliderChange}}" min="0" max="1" step="0.01"></paper-slider>
+			</div>
+		<!--</div>-->
 	</template>
 
 	<script>

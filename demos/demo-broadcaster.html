@@ -1,45 +1,45 @@
 <!DOCTYPE html>
 <html>
-<head lang="en">
-	<script src="../../webcomponentsjs/webcomponents.js"></script>
-	<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
-</head>
-<body>
+	<head>
+		<script src="../../webcomponentsjs/webcomponents.js"></script>
+		<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
+	</head>
+	<body>
 
-	<!-- Listens for call requests and responds to them with a local stream -->
-	<paper-peerjs-stream broadcasts self="broadcaster" host="tranquil-waters-9294.herokuapp.com" active></paper-peerjs-stream>
+		<!-- Listens for call requests and responds to them with a local stream -->
+		<paper-peerjs-stream broadcasts self="broadcaster" host="tranquil-waters-9294.herokuapp.com" active></paper-peerjs-stream>
 
-	<script>
-		navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
-		var e = document.querySelector('paper-peerjs-stream');
+		<script>
+			navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+			var e = document.querySelector('paper-peerjs-stream');
 
-		if (navigator.getUserMedia) {
-			navigator.getUserMedia (
+			if (navigator.getUserMedia) {
+				navigator.getUserMedia (
 
-				// constraints
-				{
-					video: true,
-					audio: true
-				},
+					// constraints
+					{
+						video: true,
+						audio: true
+					},
 
-				// successCallback
-				function(localMediaStream) {
-					window.stream = localMediaStream;
-					e.setStream(stream);
-					stream.addEventListener('ended', function() {
-						console.warn('DEMO: STREAM ENDED LOCALLY, WHY?');
-					});
-				},
+					// successCallback
+					function(localMediaStream) {
+						window.stream = localMediaStream;
+						e.setStream(stream);
+						stream.addEventListener('ended', function() {
+							console.warn('DEMO: STREAM ENDED LOCALLY, WHY?');
+						});
+					},
 
-				// errorCallback
-				function(err) {
-					console.log("The following error occured: " + err);
-				}
-			);
-		} else {
-			console.log("getUserMedia not supported");
-		}
+					// errorCallback
+					function(err) {
+						console.log("The following error occured: " + err);
+					}
+				);
+			} else {
+				console.log("getUserMedia not supported");
+			}
 
-	</script>
-</body>
+		</script>
+	</body>
 </html>
