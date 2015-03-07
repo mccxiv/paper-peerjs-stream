@@ -215,6 +215,10 @@
 				// update slider? No, it bugs out
 			},
 
+			selfChanged: function() {
+				this.fire('new-id')
+			},
+
 		/**
 			 * Main program logic.
 			 * Should run when an operation finishes and on certain events
@@ -305,7 +309,7 @@
 
 			_handlePeerOpen: function(id) {
 				this.self = id;
-				this.fire('id', id);
+				this.fire('server-connection');
 				this._main();
 			},
 
