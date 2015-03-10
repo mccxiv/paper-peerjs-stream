@@ -5,24 +5,19 @@
 		<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
 	</head>
 	<body>
-
 		<!-- Listens for call requests and responds to them with a local stream -->
 		<paper-peerjs-stream broadcasts self="broadcaster" host="tranquil-waters-9294.herokuapp.com" active></paper-peerjs-stream>
 
 		<script>
+			// Provide a stream for the broadcaster to broadcast
 			navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
 			var e = document.querySelector('paper-peerjs-stream');
 
 			if (navigator.getUserMedia) {
 				navigator.getUserMedia (
-
-					// constraints
-					{
-						video: true,
-						audio: true
-					},
-
-					// successCallback
+					//constraints
+					{video: true, audio: true},
+					//success
 					function(localMediaStream) {
 						window.stream = localMediaStream;
 						e.setStream(stream);
@@ -30,8 +25,7 @@
 							console.warn('DEMO: STREAM ENDED LOCALLY, WHY?');
 						});
 					},
-
-					// errorCallback
+					//failure
 					function(err) {
 						console.log("The following error occured: " + err);
 					}
@@ -39,7 +33,6 @@
 			} else {
 				console.log("getUserMedia not supported");
 			}
-
 		</script>
 	</body>
 </html>
