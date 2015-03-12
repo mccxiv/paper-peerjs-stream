@@ -1,9 +1,12 @@
 <!--suppress ALL -->
 <link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../paper-fab/paper-fab.html">
+<link rel="import" href="../paper-button/paper-button.html">
 <link rel="import" href="../paper-slider/paper-slider.html">
 <link rel="import" href="../paper-spinner/paper-spinner.html">
 
 <script src="../peerjs/peer.min.js"></script>
+<script src="../screenfull/dist/screenfull.min.js"></script>
 
 <polymer-element name="paper-peerjs-stream">
 	<template>
@@ -12,6 +15,9 @@
 			<paper-spinner id="spinner" active></paper-spinner>
 			<div id="toolbar">
 				<paper-slider id="volume" value="[[volume]]" on-immediate-value-change="{{_volumeSliderChange}}" min="0" max="1" step="0.01"></paper-slider>
+				<paper-button id="fullscreen">
+					<core-icon icon="settings-overscan"></core-icon>
+				</paper-button>
 			</div>
 	</template>
 
@@ -164,6 +170,7 @@
 
 			_call: undefined,             // The current call
 			_timeout: 3000,               // Wait this long between attempts
+			_callRequest: undefined,      // reference to the call request, necessary to clean up
 			_localStream: undefined,      // Stream that will be sent
 			_remoteStream: undefined,     // Stream received from call
 			_remoteStreamURL: undefined,  // Stream in url form, for src
@@ -224,15 +231,16 @@
 
 				if (!this.active) {
 					console.info('PPS: Not active or not attached to DOM, aborting.');
+					this._destroyCall();
 					this._destroyPeer();
 					return;
 				}
 
-				console.info('PPS: Checking what needs to be done');
+				console.info('PPS: Checking what needs to be done.');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this._inCall) {
 						if (!this._peerActive) {
-							console.info('PPS: Not in a call and peer not ready, preparing peer');
+							console.info('PPS: Not in a call and peer not ready, preparing peer.');
 							if (this._peerDisconnected && !this._peerDestroyed) this.peer.reconnect();
 							else this._createPeer();
 						}
@@ -241,7 +249,7 @@
 							this._performCall(this.calls);
 						}
 						else if (this.spectates) {
-							console.info('PPS: Not in a call and should be spectating, requesting call');
+							console.info('PPS: Not in a call and should be spectating, requesting call.');
 							this._requestCall();
 						}
 						else console.info('PPS: Waiting for connections...')
@@ -252,15 +260,15 @@
 							// if the peer's connection to the server dies.
 							// This default behavior is undesirable, there should be
 							// no need to end streams even if the server hiccups.
-							console.info('PPS: Already in a call, disconnecting peer as it\'s not needed');
+							console.info('PPS: Already in a call, disconnecting from server as it\'s not needed.');
 							this.peer.disconnect();
 						}
 						else {
 							// Call exists, peer is disconnected.
-							console.info('PPS: Peer not needed and was already disconnected');
+							console.info('PPS: Peer not needed and was already disconnected.');
 						}
 					}
-					else console.warn('PPS: This should not happen, in a call but have no peer reference');
+					else console.warn('PPS: This should not happen, in a call but have no peer reference.');
 				}
 				else console.info('PPS: No work needed, no tasks declared.')
 			},
@@ -290,18 +298,16 @@
 
 			_destroyPeer: function() {
 				if (this.peer) {
-					console.info('PPS: Destroying peer, this should end calls if any.');
+					console.info('PPS: Destroying peer.');
 					this.peer.destroy();
+					this.peer.removeAllListeners();
 				}
+			},
 
-				// Handle edge cases where the peer was destroyed
-				// between the moment a call was initiated and answered
-				if (this._call) {
-					console.warn('PPS: Peer destroyed but there\'s still a call.');
-					if (this._call.open) console.warn('PPS: Peer destroyed but the call is still open!');
-					this._call.close();
-					this._call = null;
-				}
+			_destroyCall: function() {
+				console.info('PPS: Closing call.');
+				this._cleanUpConnection(this._call);
+				this._call = null;
 			},
 
 			_handlePeerOpen: function(id) {
@@ -311,13 +317,23 @@
 			},
 
 			_handlePeerError: function(error) {
+				console.info('PPS: Peer error', error);
 				if (error.type === 'peer-unavailable') {
+
+					if (this._callRequest) {
+						console.info('Cleaning up failed call request');
+						console.log('INFO', this._callRequest.listeners().length);
+						console.log(this._callRequest);
+						this._callRequest.close();
+						this._callRequest.removeAllListeners();
+					}
+
 					// Non fatal error, give back control.
 					this._mainDelayed();
 				}
 				else {
 					// Assume fatal error, make sure it's dead and go back.
-					this.peer.destroy();
+					this._destroyPeer();
 					this._mainDelayed();
 				}
 			},
@@ -340,27 +356,35 @@
 					this._mainDelayed();
 				}
 				else {
-					console.warn('PPS: Want to call, but no stream is available');
+					console.warn('PPS: Want to call, but no stream is available.');
 					this._mainDelayed();
 				}
 			},
 
 			_handleCallRequest: function(remote) {
 				if (!this._inCall) this._performCall(remote);
-				else console.warn('PPS: Already in a call, ignoring call-request');
+				else console.warn('PPS: Already in a call, ignoring call-request.');
 			},
 
 			_requestCall: function() {
+				console.info('PPS: Requesting a call.')
 				var pps = this;
 				var successful = false;
-				var conn = this.peer.connect(this.spectates, {
+
+				// Need to save a reference in order to clean up later.
+				// Explanation: if the remote peer is unavailable it will
+				// trigger a peer error but NO connection error (why?!)
+				this._callRequest = this.peer.connect(this.spectates, {
 					reliable: true,
 					metadata: 'call-request'
 				});
+
+				var conn = this._callRequest;
 				conn.on('open', function () {
 					successful = true;
-					console.info('PPS: Closing unnecessary data connection');
+					console.info('PPS: Closing unnecessary data connection.');
 					conn.close(); // Not needed anymore, request was sent.
+					conn.removeAllListeners();
 
 					// Now it's up to the broadcaster to call us back.
 					// Try again in a bit in case no call was received.
@@ -369,8 +393,10 @@
 				conn.on('close', requestFailure);
 				conn.on('error', requestFailure);
 				function requestFailure() {
+					console.warn('PPS: Call request ended.');
+					conn.removeAllListeners();
 					if (!successful) {
-						console.warn('PPS: Call request failed');
+						console.warn('PPS: Call request failed.');
 						pps._mainDelayed();
 					}
 				}
@@ -391,16 +417,15 @@
 			},
 
 			_handleCallEnd: function(e) {
-				console.warn('PPS: call ended, closing just to make sure');
-				this._call.close(); // Making sure it's destroyed.
-				this._call = null;
+				console.warn('PPS: call ended, cleaning up its listeners.');
+				this._destroyCall();
 				this._mainDelayed();
 			},
 
 			_handleStream: function(stream) {
 				this._remoteStream = stream;
 				this._remoteStreamURL = URL.createObjectURL(stream);
-				stream.addEventListener('ended', this._handleStreamEnded.bind(this));
+				stream.addEventListener('ended', this._handleStreamEnded.bind(this)); // TODO does this leak?
 				this._mainDelayed(); // TODO: is this unnecessary?
 			},
 
@@ -411,11 +436,7 @@
 				// using the same call?
 				console.warn('PPS: stream ended, reconnecting...');
 
-				if (this._call) {
-					if (this._call.open) console.warn('PPS: Stream ended but call is active, closing call anyways');
-					this._call.close(); // Just to be safe
-					this._call = null;
-				}
+				this._destroyCall();
 				this._uiHandleStreamEnd();
 				this._mainDelayed();
 			},
@@ -459,10 +480,11 @@
 				//noinspection JSUnresolvedFunction
 				var anim = spinner.animate([from, to], opts);
 
+				/*
 				anim.addEventListener('finish', function() {
 					spinner.removeAttribute('active');
 					spinner.style.display = 'none';
-				}.bind(this));
+				}.bind(this));*/
 			},
 
 			_uiShowVideo: function() {
@@ -476,6 +498,13 @@
 
 			_volumeSliderChange: function() {
 				this.volume = this.$.volume.immediateValue;
+			},
+
+			_cleanUpConnection: function(conn) {
+				if (conn && conn.close) {
+					conn.close();
+					conn.removeAllListeners();
+				}
 			}
 		});
 	</script>

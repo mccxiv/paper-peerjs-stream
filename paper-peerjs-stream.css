@@ -3,8 +3,8 @@
 	text-align: center;
 	display: inline-block;
 	background-color: black;
-	width: 280px;
-	height: 158px;
+	min-width: 280px;
+	min-height: 158px;
 }
 
 #video {
@@ -29,18 +29,29 @@
 }
 
 #toolbar {
-	right: 0;
-	bottom: 0;
+	right: 2px;
+	bottom: 4px;
 	position: absolute;
+	opacity: 0;
+	transition: opacity 150ms {{_easing}};
+}
+
+#fullscreen {
+	height: 32px;
+	padding: 4px;
+	vertical-align: top;
+	min-width: 0;
+}
+
+#fullscreen /deep/ .button-content {
+	padding: 0;
 }
 
 #volume {
-	opacity: 0;
 	width: 100px;
-	transition: opacity 300ms {{_easing}};
 }
 
-:host(:hover) #volume {
+:host(:hover) #toolbar {
 	opacity: 1;
 }
 
@@ -48,6 +59,7 @@
 	background-color: inherit;
 }
 
+#fullscreen,
 #volume /deep/ #sliderKnobInner,
 #volume /deep/ #progressContainer {
 	background-color: {{color}};

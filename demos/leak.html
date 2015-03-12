@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+
+<script src="http://cdn.peerjs.com/0.3.9/peer.min.js"></script>
+<script>
+	var p = new Peer({key: 'y6ws1u4by75mte29', debug: 3});
+
+	// .connect to a non existent peer every second
+	setInterval(function() {
+		p.connect(Math.random().toString(36).substring(7));
+	}, 1000)
+
+	// starts at 85k
+</script>
