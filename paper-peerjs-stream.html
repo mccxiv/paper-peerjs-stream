@@ -149,11 +149,11 @@
 				 * Css color to use for UI elements like the volume control.
 				 * May also be set via styles instead of using this attribute.
 				 *
-				 * @attribute color
+				 * @attribute uicolor
 				 * @type string
 				 * @default '#FF5722' - Deep Orange google.com/design/spec/style/color.html
 				 */
-				color: '#FF5722'
+				uicolor: '#FF5722'
 			},
 
 			computed: {
@@ -480,11 +480,10 @@
 				//noinspection JSUnresolvedFunction
 				var anim = spinner.animate([from, to], opts);
 
-				/*
 				anim.addEventListener('finish', function() {
 					spinner.removeAttribute('active');
 					spinner.style.display = 'none';
-				}.bind(this));*/
+				}.bind(this));
 			},
 
 			_uiShowVideo: function() {
@@ -499,6 +498,16 @@
 			_toggleFullscreen: function() {
 				if (screenfull.enabled) {
 					screenfull.toggle(this);
+					if (screenfull.isFullscreen) {
+						this.style.display = 'block';
+						this.style.width = '100%';
+						this.style.height = '100%';
+					}
+					else {
+						this.style.removeProperty('display');
+						this.style.removeProperty('width');
+						this.style.removeProperty('height');
+					}
 				}
 			},
 

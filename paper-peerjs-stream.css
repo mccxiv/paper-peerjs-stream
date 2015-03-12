@@ -49,6 +49,7 @@
 
 #volume {
 	width: 100px;
+	cursor: pointer;
 }
 
 :host(:hover) #toolbar {
@@ -59,8 +60,12 @@
 	background-color: inherit;
 }
 
-#fullscreen,
 #volume /deep/ #sliderKnobInner,
 #volume /deep/ #progressContainer {
-	background-color: {{color}};
+	background-color: {{uicolor}};
+}
+
+#fullscreen {
+	margin-left: -12px;
+	color: {{uicolor}};
 }
