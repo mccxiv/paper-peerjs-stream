@@ -6,7 +6,7 @@
 <link rel="import" href="../paper-spinner/paper-spinner.html">
 
 <script src="../peerjs/peer.min.js"></script>
-<script src="../screenfull/dist/screenfull.min.js"></script>
+<script src="../screenfull/dist/screenfull.js"></script>
 
 <polymer-element name="paper-peerjs-stream">
 	<template>
@@ -15,7 +15,7 @@
 			<paper-spinner id="spinner" active></paper-spinner>
 			<div id="toolbar">
 				<paper-slider id="volume" value="[[volume]]" on-immediate-value-change="{{_volumeSliderChange}}" min="0" max="1" step="0.01"></paper-slider>
-				<paper-button id="fullscreen">
+				<paper-button id="fullscreen" on-click="{{_toggleFullscreen}}">
 					<core-icon icon="settings-overscan"></core-icon>
 				</paper-button>
 			</div>
@@ -494,6 +494,12 @@
 
 				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
 				this.$.video.animate([from, to], opts);
+			},
+
+			_toggleFullscreen: function() {
+				if (screenfull.enabled) {
+					screenfull.toggle(this);
+				}
 			},
 
 			_volumeSliderChange: function() {
