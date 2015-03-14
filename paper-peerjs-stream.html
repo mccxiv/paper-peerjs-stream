@@ -289,6 +289,7 @@
 					peerOpts.path = this.path;
 				}
 				this.peer = this.self ? new Peer(this.self, peerOpts) : new Peer(peerOpts);
+				console.info('PPS: Peer created, waiting for open event');
 				this.peer.on('open', this._handlePeerOpen.bind(this));
 				this.peer.on('error', this._handlePeerError.bind(this));
 				this.peer.on('call', this._handleCall.bind(this));
