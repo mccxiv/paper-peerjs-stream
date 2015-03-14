@@ -312,6 +312,7 @@
 
 			_handlePeerOpen: function(id) {
 				this.self = id;
+				console.info('PPS: Connection to server open.');
 				this.fire('server-connection');
 				this._main();
 			},
