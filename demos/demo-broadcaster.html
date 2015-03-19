@@ -9,29 +9,20 @@
 		<paper-peerjs-stream broadcasts self="broadcaster" host="peerjs.wiff.me" active></paper-peerjs-stream>
 
 		<script>
+
 			// Provide a stream for the broadcaster to broadcast
 			navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
 			var e = document.querySelector('paper-peerjs-stream');
+			var constraints = {video: true, audio: true};
 
-			if (navigator.getUserMedia) {
-				navigator.getUserMedia (
-					//constraints
-					{video: true, audio: true},
-					//success
-					function(localMediaStream) {
-						window.stream = localMediaStream;
-						e.setStream(stream);
-						stream.addEventListener('ended', function() {
-							console.warn('DEMO: STREAM ENDED LOCALLY, WHY?');
-						});
-					},
-					//failure
-					function(err) {
-						console.log("The following error occured: " + err);
-					}
-				);
-			} else {
-				console.log("getUserMedia not supported");
+			navigator.getUserMedia (constraints, success, failure);
+
+			function success(stream) {
+				e.setStream(stream);
+			}
+
+			function failure(err) {
+				console.log("The following error occured: " + err);
 			}
 		</script>
 	</body>
