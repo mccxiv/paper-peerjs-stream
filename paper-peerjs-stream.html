@@ -158,7 +158,6 @@
 
 			computed: {
 				_inCall: '!!_call',
-				_isAttached: '!!parentNode',
 				_peerActive: 'peer && !peer.destroyed && !peer.disconnected',
 				_peerDestroyed: 'peer && peer.destroyed',
 				_peerDisconnected: 'peer && peer.disconnected',
@@ -228,14 +227,12 @@
 			 * Should run when an operation finishes and on certain events
 			 */
 			_main: function() {
-
 				if (!this.active) {
-					console.info('PPS: Not active or not attached to DOM, aborting.');
+					console.info('PPS: Not active, aborting.');
 					this._destroyCall();
 					this._destroyPeer();
 					return;
 				}
-
 				console.info('PPS: Checking what needs to be done.');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
 					if (!this._inCall) {
@@ -256,10 +253,6 @@
 					}
 					else if (this.peer) {
 						if (!this._peerDisconnected) {
-							// Crucial step. PeerJS will close all media connections
-							// if the peer's connection to the server dies.
-							// This default behavior is undesirable, there should be
-							// no need to end streams even if the server hiccups.
 							console.info('PPS: Already in a call, disconnecting from server as it\'s not needed.');
 							this.peer.disconnect();
 						}
@@ -291,10 +284,11 @@
 				}
 				this.peer = this.self ? new Peer(this.self, peerOpts) : new Peer(peerOpts);
 				console.info('PPS: Peer created, waiting for open event');
+				this.peer.on('call', this._handleCall.bind(this));
 				this.peer.on('open', this._handlePeerOpen.bind(this));
 				this.peer.on('error', this._handlePeerError.bind(this));
-				this.peer.on('call', this._handleCall.bind(this));
 				this.peer.on('connection', this._handleConnection.bind(this));
+				this.peer.on('disconnected', this._handlePeerDisconnected.bind(this));
 			},
 
 			_destroyPeer: function() {
@@ -318,24 +312,30 @@
 				this._main();
 			},
 
+			_handlePeerDisconnected: function(e) {
+				console.info('PPS: Peer disconnected', e);
+				this._mainDelayed();
+			},
+
 			_handlePeerError: function(error) {
 				console.info('PPS: Peer error', error);
-				if (error.type === 'peer-unavailable') {
-
-					if (this._callRequest) {
-						console.info('PPS: Cleaning up failed call request');
-						console.log(this._callRequest);
-						this._callRequest.close();
-						this._callRequest.removeAllListeners();
-					}
-
-					// Non fatal error, give back control.
-					this._mainDelayed();
-				}
-				else {
-					// Assume fatal error, make sure it's dead and go back.
-					this._destroyPeer();
-					this._mainDelayed();
+				switch (error.type) {
+					case 'peer-unavailable':
+						if (this._callRequest) {
+							console.info('PPS: Cleaning up failed call request');
+							console.log(this._callRequest);
+							this._callRequest.close();
+							this._callRequest.removeAllListeners();
+						}
+						this._mainDelayed();
+						break
+					case 'network':
+						// Non fatal, let the 'disconnected' handler handle it instead.
+						break
+					default:
+						// Assume fatal error, make sure it's killed.
+						this._destroyPeer();
+						this._mainDelayed();
 				}
 			},
 
@@ -432,11 +432,7 @@
 
 			_handleStreamEnded: function()
 			{
-				// TODO: ??
-				// Consider a different approach. Can a stream come back
-				// using the same call?
 				console.warn('PPS: stream ended, reconnecting...');
-
 				this._destroyCall();
 				this._uiHandleStreamEnd();
 				this._mainDelayed();
@@ -447,7 +443,6 @@
 			},
 
 			/* UI handlers */
-
 			_uiHandleStreamStart: function() {
 				this._uiHideSpinner();
 				this._uiShowVideo();
@@ -458,27 +453,20 @@
 			},
 
 			_uiShowSpinner: function() {
-				//noinspection JSUnresolvedVariable
 				var spinner = this.$.spinner;
 				var from =  {opacity: 0};
 				var to =    {opacity: 1};
 				var opts =  {duration: 5000, easing: this._easing};
-
 				spinner.setAttribute('active', true);
 				spinner.style.display = 'inline-block';
-
-				//noinspection JSUnresolvedFunction
 				spinner.animate([from, to], opts);
 			},
 
 			_uiHideSpinner: function() {
-				//noinspection JSUnresolvedVariable
 				var spinner = this.$.spinner;
 				var from =  {opacity: 1};
 				var to =    {opacity: 0};
 				var opts =  {duration: 500, easing: this._easing};
-
-				//noinspection JSUnresolvedFunction
 				var anim = spinner.animate([from, to], opts);
 
 				anim.addEventListener('finish', function() {
@@ -491,8 +479,6 @@
 				var from =  {opacity: 0, transform: 'scale3d(.3, .3, .3)'};
 				var to =    {opacity: 1, transform: 'none'};
 				var opts =  {duration: 500, easing: this._easing};
-
-				//noinspection JSUnresolvedFunction, JSUnresolvedVariable
 				this.$.video.animate([from, to], opts);
 			},
 
