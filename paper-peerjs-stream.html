@@ -323,8 +323,7 @@
 				if (error.type === 'peer-unavailable') {
 
 					if (this._callRequest) {
-						console.info('Cleaning up failed call request');
-						console.log('INFO', this._callRequest.listeners().length);
+						console.info('PPS: Cleaning up failed call request');
 						console.log(this._callRequest);
 						this._callRequest.close();
 						this._callRequest.removeAllListeners();
