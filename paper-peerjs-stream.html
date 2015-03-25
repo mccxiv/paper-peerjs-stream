@@ -157,7 +157,6 @@
 			},
 
 			computed: {
-				_inCall: '!!_call',
 				_peerActive: 'peer && !peer.destroyed && !peer.disconnected',
 				_peerDestroyed: 'peer && peer.destroyed',
 				_peerDisconnected: 'peer && peer.disconnected',
@@ -235,7 +234,7 @@
 				}
 				console.info('PPS: Checking what needs to be done.');
 				if (this.spectates || this.broadcasts || this.calls || this.answers) {
-					if (!this._inCall) {
+					if (!this._call) {
 						if (!this._peerActive) {
 							console.info('PPS: Not in a call and peer not ready, preparing peer.');
 							if (this._peerDisconnected && !this._peerDestroyed) this.peer.reconnect();
@@ -251,17 +250,22 @@
 						}
 						else console.info('PPS: Waiting for connections...')
 					}
-					else if (this.peer) {
-						if (!this._peerDisconnected) {
-							console.info('PPS: Already in a call, disconnecting from server as it\'s not needed.');
-							this.peer.disconnect();
+					else {
+						if (!this._call.open) {
+							// TODO figure out why this happens, this bandaid works for now.
+							console.info('PPS: Call exists but not open for some reason. Destroying it in 3 seconds if still closed.');
+							this._dealWithHalfOpenCall();
 						}
 						else {
-							// Call exists, peer is disconnected.
-							console.info('PPS: Peer not needed and was already disconnected.');
+							if (!this._peerDisconnected) {
+								console.info('PPS: Already in a call, disconnecting from server as it\'s not needed.');
+								this.peer.disconnect();
+							}
+							else {
+								console.info('PPS: No work needed, already in call. Idling until next event.');
+							}
 						}
 					}
-					else console.warn('PPS: This should not happen, in a call but have no peer reference.');
 				}
 				else console.info('PPS: No work needed, no tasks declared.')
 			},
@@ -347,6 +351,17 @@
 				}
 			},
 
+			_dealWithHalfOpenCall: function() {
+				setTimeout(check.bind(this), 3000);
+
+				function check() {
+					if (this._call && !this._call.open) {
+						this._destroyCall();
+					}
+					this._main();
+				}
+			},
+
 			_performCall: function(remote) {
 				if (this._haveLocalStream) {
 					this._call = this.peer.call(remote, this._localStream);
@@ -363,7 +378,7 @@
 			},
 
 			_handleCallRequest: function(remote) {
-				if (!this._inCall) this._performCall(remote);
+				if (!this._call) this._performCall(remote);
 				else console.warn('PPS: Already in a call, ignoring call-request.');
 			},
 
@@ -404,7 +419,7 @@
 			},
 
 			_handleCall: function(call) {
-				if (this._inCall) return; // One at a time please.
+				if (this._call) return; // One at a time please.
 				if (call.peer !== this.spectates && !this.answers) return;
 
 				this._call = call;
@@ -418,7 +433,7 @@
 			},
 
 			_handleCallEnd: function(e) {
-				console.warn('PPS: call ended, cleaning up its listeners.');
+				console.warn('PPS: Call ended, cleaning up its listeners.');
 				this._destroyCall();
 				this._mainDelayed();
 			},
@@ -432,7 +447,7 @@
 
 			_handleStreamEnded: function()
 			{
-				console.warn('PPS: stream ended, reconnecting...');
+				console.warn('PPS: Stream ended, reconnecting...');
 				this._destroyCall();
 				this._uiHandleStreamEnd();
 				this._mainDelayed();
@@ -505,7 +520,7 @@
 			_cleanUpConnection: function(conn) {
 				if (conn && conn.close) {
 					conn.close();
-					conn.removeAllListeners();
+					//conn.removeAllListeners();
 				}
 			}
 		});

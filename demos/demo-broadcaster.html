@@ -13,7 +13,7 @@
 			// Provide a stream for the broadcaster to broadcast
 			navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
 			var e = document.querySelector('paper-peerjs-stream');
-			var constraints = {video: true, audio: true};
+			var constraints = {video: true, audio: false};
 
 			navigator.getUserMedia (constraints, success, failure);
 

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="../../webcomponentsjs/webcomponents.js"></script>
+		<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
+	</head>
+	<body>
+		<!-- Requests to get be called by 'broadcaster' -->
+		<paper-peerjs-stream host="peerjs.wiff.me" spectates="broadcaster" active></paper-peerjs-stream>
+
+		<script>
+			setTimeout(function() {
+				window.location.reload();
+			}, 40000)
+		</script>
+	</body>
+</html>
