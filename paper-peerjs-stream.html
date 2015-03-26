@@ -20,9 +20,7 @@
 				</paper-button>
 			</div>
 	</template>
-
 	<script>
-
 		'use strict';
 
 		//noinspection JSValidateTypes, JSUnusedGlobalSymbols, JSValidateJSDoc
@@ -156,26 +154,6 @@
 				uicolor: '#FF5722'
 			},
 
-			computed: {
-				_peerActive: 'peer && !peer.destroyed && !peer.disconnected',
-				_peerDestroyed: 'peer && peer.destroyed',
-				_peerDisconnected: 'peer && peer.disconnected',
-				_haveLocalStream: '_localStream && !_localStream.ended',
-				_haveRemoteStream: '_remoteStream && !_remoteStream.ended'
-			},
-
-			peer : undefined,    // PeerJS instance, will change throughout lifecycle
-
-			_call: undefined,             // The current call
-			_timeout: 3000,               // Wait this long between attempts
-			_callRequest: undefined,      // reference to the call request, necessary to clean up
-			_localStream: undefined,      // Stream that will be sent
-			_remoteStream: undefined,     // Stream received from call
-			_remoteStreamURL: undefined,  // Stream in url form, for src
-			_queuedMain: 0,               // To prevent multiple operations
-
-			_easing: 'cubic-bezier(.55, 0, .1, 1)',  // Easing for use in animations
-
 			/**
 			 * Provide a stream for use in calls.
 			 * Some actions won't work until a stream is provided with this method.
@@ -188,15 +166,29 @@
 				this._main();
 			},
 
-			/**
-			 * Lifecycle handlers
-			 */
+			computed: {
+				_peerActive: 'peer && !peer.destroyed && !peer.disconnected',
+				_peerDestroyed: 'peer && peer.destroyed',
+				_peerDisconnected: 'peer && peer.disconnected',
+				_haveLocalStream: '_localStream && !_localStream.ended',
+				_haveRemoteStream: '_remoteStream && !_remoteStream.ended'
+			},
+
+			peer : undefined,    // PeerJS instance, will change throughout lifecycle
+
+			_call: undefined,               // The current call
+			_timeout: 3000,                 // Wait this long between attempts
+			_queuedMain: 0,                 // To prevent multiple operations
+			_callRequest: undefined,        // reference to the call request, necessary to clean up
+			_localStream: undefined,        // Stream that will be sent
+			_remoteStream: undefined,       // Stream received from call
+			_remoteStreamURL: undefined,    // Stream in url form, for src
+			_queuedDestroyCall: undefined,  // To prevent multiple operations
+
+			_easing: 'cubic-bezier(.55, 0, .1, 1)',  // Easing for use in animations
+
 			ready: function() {this._main();},
 
-
-			/**
-			 * Observers?! SO COOL
-			 */
 			_haveRemoteStreamChanged: function(oldVal, newVal) {
 				if (newVal) {
 					this._uiHideSpinner();
@@ -204,7 +196,7 @@
 				}
 				else {
 					this._uiShowSpinner();
-					this.fire('remote-stream-end')
+					this.fire('remote-stream-end');
 				}
 			},
 
@@ -218,12 +210,11 @@
 			},
 
 			selfChanged: function() {
-				this.fire('new-id')
+				this.fire('new-id');
 			},
 
 			/**
-			 * Main program logic.
-			 * Should run when an operation finishes and on certain events
+			 * Should run on events and when each operation finishes
 			 */
 			_main: function() {
 				if (!this.active) {
@@ -252,9 +243,9 @@
 					}
 					else {
 						if (!this._call.open) {
-							// TODO figure out why this happens, this bandaid works for now.
+							// TODO figure out why this happens. Bandaid fix for now
 							console.info('PPS: Call exists but not open for some reason. Destroying it in 3 seconds if still closed.');
-							this._dealWithHalfOpenCall();
+							this._destroyCallIfUnopenedDelayed();
 						}
 						else {
 							if (!this._peerDisconnected) {
@@ -272,8 +263,20 @@
 
 			_mainDelayed: function() {
 				if (this._queuedMain) return;
-				this._queuedMain = setTimeout(function () {
+				this._queuedMain = setTimeout(function() {
 					this._queuedMain = null;
+					this._main();
+				}.bind(this), this._timeout);
+			},
+
+			_destroyCallIfUnopenedDelayed: function() {
+				if (this._queuedDestroyCall) return;
+				this._queuedDestroyCall = setTimeout(function() {
+					console.info('PPS: Call is still closed, destroying it.')
+					this._queuedDestroyCall = null;
+					if (this._call && !this._call.open) {
+						this._destroyCall();
+					}
 					this._main();
 				}.bind(this), this._timeout);
 			},
@@ -305,8 +308,15 @@
 
 			_destroyCall: function() {
 				console.info('PPS: Closing any existing call.');
-				this._cleanUpConnection(this._call);
-				this._call = null;
+				if (this._call) {
+					this._call.close();
+					this._call = null;
+				}
+			},
+
+			_destroyCallRequest: function() {
+				console.info('PPS: Closing failed call request. (probably peer-unavailable)');
+				if (this._callRequest) this._callRequest.close();
 			},
 
 			_handlePeerOpen: function(id) {
@@ -325,12 +335,7 @@
 				console.info('PPS: Peer error', error);
 				switch (error.type) {
 					case 'peer-unavailable':
-						if (this._callRequest) {
-							console.info('PPS: Cleaning up failed call request');
-							console.log(this._callRequest);
-							this._callRequest.close();
-							this._callRequest.removeAllListeners();
-						}
+						this._destroyCallRequest();
 						this._mainDelayed();
 						break
 					case 'network':
@@ -351,15 +356,9 @@
 				}
 			},
 
-			_dealWithHalfOpenCall: function() {
-				setTimeout(check.bind(this), 3000);
-
-				function check() {
-					if (this._call && !this._call.open) {
-						this._destroyCall();
-					}
-					this._main();
-				}
+			_handleCallRequest: function(remote) {
+				if (!this._call) this._performCall(remote);
+				else console.warn('PPS: Already in a call, ignoring call-request.');
 			},
 
 			_performCall: function(remote) {
@@ -375,11 +374,6 @@
 					console.warn('PPS: Want to call, but no stream is available.');
 					this._mainDelayed();
 				}
-			},
-
-			_handleCallRequest: function(remote) {
-				if (!this._call) this._performCall(remote);
-				else console.warn('PPS: Already in a call, ignoring call-request.');
 			},
 
 			_requestCall: function() {
@@ -515,15 +509,7 @@
 
 			_volumeSliderChange: function() {
 				this.volume = this.$.volume.immediateValue;
-			},
-
-			_cleanUpConnection: function(conn) {
-				if (conn && conn.close) {
-					conn.close();
-					//conn.removeAllListeners();
-				}
 			}
 		});
 	</script>
-
 </polymer-element>
