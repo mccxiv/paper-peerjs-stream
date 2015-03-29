@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="../../webcomponentsjs/webcomponents.js"></script>
+		<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
+	</head>
+	<body>
+		<!--
+			key:        your PeerJS cloud server API key, http://peerjs.com/peerserver
+			peerid:     which ID to use on the server, omit to obtain one from the server
+			broadcasts: means this element listens for spectators and calls them back
+			active:     the element starts working immediately
+		-->
+		<paper-peerjs-stream key="y6ws1u4by75mte29" peerid="broadcaster" broadcasts active></paper-peerjs-stream>
+
+		<script>
+			pps = document.querySelector('paper-peerjs-stream');
+			navigator.getUserMedia = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
+
+			navigator.getUserMedia(
+				{video: true},
+				function success(stream) {pps.localStream = stream;},
+				function err(e) {}
+			);
+		</script>
+	</body>
+</html>

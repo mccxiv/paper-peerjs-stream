@@ -8,6 +8,41 @@
 <script src="../screenfull/dist/screenfull.js"></script>
 <script src="../web-animations-js/web-animations-next-lite.min.js"></script>
 
+<!--
+A Polymer element for using webrtc media streams.
+Powered by [PeerJS](http://prismjs.com).
+
+## Use Cases
+
+##### Styling
+
+##### Minimal Example
+
+A one way call, b.html will play back the stream provided by a.html
+
+a.html
+	<paper-peerjs-stream key="y6ws1u4by75mte29" peerid="broadcaster" broadcasts active></paper-peerjs-stream>
+	<script>
+		var pps = document.querySelector('paper-peerjs-stream');
+		navigator.getUserMedia({video: true}, function(stream) {
+			pps.setStream(stream)
+		});
+	</script>
+
+b.html
+	<paper-peerjs-stream key="y6ws1u4by75mte29" spectates="broadcaster"></paper-peerjs-stream>
+
+##### Installation
+      $ bower install paper-peerjs-stream --save
+
+@element paper-peerjs-stream
+@blurb Declarative webrtc media streams
+@status alpha
+@author Andrea Stella
+@categories webrtc p2p
+@homepage http://github.com/mccxiv/paper-peerjs-stream
+-->
+
 <polymer-element name="paper-peerjs-stream">
 	<template>
 		<link rel="stylesheet" href="styles.css">
@@ -27,8 +62,10 @@
 		Polymer({
 			publish: {
 				/**
-				 * Using the official cloud server?
-				 * Provide your PeerJS API key.
+				 * The `key` attribute specifies the API key for use with the 
+				 * PeerJS cloud server. If this attribute is specified, 
+				 * `host`, `port` and `path` are ignored.
+				 * More info on the cloud server is available at http://peerjs.com/peerserver
 				 *
 				 * @attribute key
 				 * @type string
@@ -36,75 +73,77 @@
 				key: null,
 
 				/**
-				 * Hosting your own server? https://github.com/peers/peerjs-server
-				 * These properties will be used if no key was provided
+				 * For self hosted PeerJS servers, the `host` attribute 
+				 * specifies the PeerJS server address, it should not 
+				 * contain `http://` or any other scheme. 
 				 *
-				 * PeerJS server host (omit http://)
 				 * @attribute host
 				 * @type string
 				 * @default 'localhost'
+				 */
+				host: 'localhost',
+
+				/**
+				 * For self hosted PeerJS servers, the `port` attribute
+				 * specifies the PeerJS server port.
 				 *
-				 * PeerJS server port
 				 * @attribute port
 				 * @type number
 				 * @default 80
+				 */
+				port: 80,
+
+				/**
+				 * For self hosted PeerJS servers, the `path` attribute
+				 * specifies the PeerJS path on the server. (e.g. /my-server/)
 				 *
-				 * Path on the server
 				 * @attribute path
 				 * @type string
 				 * @default '/'
 				 */
-				host: 'localhost',
-				port: 80,
 				path: '/',
 
 				/**
-				 * This peer's ID.
-				 * Optional, the server can provide one
+				 * The `peerid` attribute lets you reserve a particular id on 
+				 * the server. It is optional, the server will provide a random
+				 * id if this was left unspecified.
 				 *
-				 * @attribute self
+				 * @attribute peerid
 				 * @type string
 				 */
-				self: {value: null, reflect: true},
+				peerid: {value: null, reflect: true},
 
 				/**
-				 * The id of a remote broadcaster.
-				 *
-				 * Behavior:
-				 * - Sends call-requests (not calls) to the broadcaster.
-				 * - Answers calls from the broadcaster only.
-				 *
-				 * Explanation:
-				 * - Generally, a spectator wants to consume a particular
-				 *   broadcaster's stream, acting as a client.
-				 *
-				 * @attribute spectate
+				 * The `spectates` attribute specifies8 a broadcaster's id and 
+				 * makes this element a spectator. Spectators get in contact 
+				 * with the broadcaster (via data connection) and request to 
+				 * be called. This transaction allows the spectator to receive 
+				 * a stream without ever providing one.
+				 * 
+				 * @attribute spectates
 				 * @type string
 				 */
 				spectates: {value: null, reflect: true},
 
 				/**
-				 * If true and if a local stream was provided,
-				 * answers any incoming call requests by calling.
+				 * When `broadcasts` is true, the element will wait for 
+				 * spectators to send call requests and respond by calling
+				 * them with its local media stream.
+				 * 
+				 * A `call request` is a data connection with a particular
+				 * metadata. It is done this way because PeerJS does not 
+				 * currently support one way calls, i.e. a stream must
+				 * be provided when initiating a call.
 				 *
-				 * Behavior:
-				 * - Responds to call-requests (not calls) by calling back.
-				 *
-				 * Explanation:
-				 * - Generally, a broadcaster will sit around waiting for
-				 *   a spectator to send a call request, acting as a server
-				 *
-				 * @attribute broadcast
+				 * @attribute broadcasts
 				 * @type boolean
-				 * @default false
 				 */
 				broadcasts: {value: false, reflect: true},
 
 				/**
-				 * If present, and if a local stream is available, calls the peer
-				 *
-				 * Behavior
-				 * - Calls peer
+				 * The `calls` attribute specifies a remote id. When present 
+				 * the element will attempt to call said id until successful,
+				 * unless no local stream is available.
 				 *
 				 * @attribute calls
 				 * @type string
@@ -112,30 +151,28 @@
 				calls: null,
 
 				/**
-				 * If true, answers calls
-				 *
-				 * behavior:
-				 * - Answers any call
+				 * The `answers` attribute tells the element to answer any
+				 * incoming call, it will answer without a local stream if
+				 * it was not available at the time when the incoming call
+				 * was answered.
 				 *
 				 * @attribute answers
 				 * @type boolean
-				 * @default false
 				 */
 				answers: {value: false, reflect: true},
 
 				/**
-				 * If true, the element will not wait for .start()
-				 * Also causes the element to start and stop when
-				 * this attribute is dynamically changed
+				 * The element will not perform any action unless the 
+				 * `active` attribute is present  
 				 *
 				 * @attribute active
 				 * @type boolean
-				 * @default false
 				 */
 				active: {value: false, reflect: true},
 
 				/**
-				 * Volume of the incoming stream, from 0 to 1
+				 * The `volume` attribute sets the loudness of the incoming
+				 * stream, from 0 to 1.
 				 *
 				 * @attribute volume
 				 * @type number
@@ -144,61 +181,65 @@
 				volume: {value: 0.75, reflect: true},
 
 				/**
-				 * Css color to use for UI elements like the volume control.
-				 * May also be set via styles instead of using this attribute.
+				 * The `uicolor` attribute helps set the CSS color of the 
+				 * various UI elements: volume slider and fullscreen button.
+				 * Colors may also be set via regular CSS, if finer control
+				 * is desired.
 				 *
 				 * @attribute uicolor
 				 * @type string
-				 * @default '#FF5722' - Deep Orange google.com/design/spec/style/color.html
+				 * @default '#FF5722'
 				 */
-				uicolor: '#FF5722'
+				uicolor: '#FF5722',
 			},
 
 			/**
-			 * Provide a stream for use in calls.
-			 * Some actions won't work until a stream is provided with this method.
+			 * Local media stream, it will be sent to anyone that engages
+			 * in a call with with this peer.
 			 *
-			 * @public
-			 * @param {MediaStream} stream
+			 * @property localStream
+			 * @type MediaStream
+			 * @default null
 			 */
-			setStream: function(stream) {
-				this._localStream = stream;
-				this._main();
-			},
+			localStream: null,
+
+			/**
+			 * Remote media stream, obtained through a call with another peer.
+			 *
+			 * @property remoteStream
+			 * @type MediaStream
+			 * @default null
+			 */
+			remoteStream: null,
+
+			/**
+			 * PeerJS instance. Note this object will change throughout the
+			 * element's lifecycle, you should not hold your own reference.
+			 *
+			 * @property peer
+			 * @type Object
+			 * @default null
+			 */
+			peer : null,
 
 			computed: {
 				_peerActive: 'peer && !peer.destroyed && !peer.disconnected',
 				_peerDestroyed: 'peer && peer.destroyed',
 				_peerDisconnected: 'peer && peer.disconnected',
-				_haveLocalStream: '_localStream && !_localStream.ended',
-				_haveRemoteStream: '_remoteStream && !_remoteStream.ended'
+				_haveLocalStream: 'localStream && !localStream.ended',
+				_haveRemoteStream: 'remoteStream && !remoteStream.ended'
 			},
-
-			peer : undefined,    // PeerJS instance, will change throughout lifecycle
 
 			_call: undefined,               // The current call
 			_timeout: 3000,                 // Wait this long between attempts
 			_queuedMain: 0,                 // To prevent multiple operations
 			_callRequest: undefined,        // reference to the call request, necessary to clean up
-			_localStream: undefined,        // Stream that will be sent
-			_remoteStream: undefined,       // Stream received from call
 			_remoteStreamURL: undefined,    // Stream in url form, for src
 			_queuedDestroyCall: undefined,  // To prevent multiple operations
 
 			_easing: 'cubic-bezier(.55, 0, .1, 1)',  // Easing for use in animations
 
 			ready: function() {this._main();},
-
-			_haveRemoteStreamChanged: function(oldVal, newVal) {
-				if (newVal) {
-					this._uiHideSpinner();
-					this.fire('remote-stream', this._remoteStream);
-				}
-				else {
-					this._uiShowSpinner();
-					this.fire('remote-stream-end');
-				}
-			},
 
 			attributeChanged: function(attribute) {
 				if (attribute !== 'volume')	this._main();
@@ -209,8 +250,19 @@
 				// update slider? No, it bugs out
 			},
 
-			selfChanged: function() {
-				this.fire('new-id');
+			peeridChanged: function() {
+				this.fire('new-id', this.peerid);
+			},
+
+			_haveRemoteStreamChanged: function(oldVal, newVal) {
+				if (newVal) {
+					this._uiHideSpinner();
+					this.fire('remote-stream', this.remoteStream);
+				}
+				else {
+					this._uiShowSpinner();
+					this.fire('remote-stream-end');
+				}
 			},
 
 			/**
@@ -289,7 +341,7 @@
 					peerOpts.port = this.port;
 					peerOpts.path = this.path;
 				}
-				this.peer = this.self ? new Peer(this.self, peerOpts) : new Peer(peerOpts);
+				this.peer = this.peerid ? new Peer(this.peerid, peerOpts) : new Peer(peerOpts);
 				console.info('PPS: Peer created, waiting for open event');
 				this.peer.on('call', this._handleCall.bind(this));
 				this.peer.on('open', this._handlePeerOpen.bind(this));
@@ -320,7 +372,7 @@
 			},
 
 			_handlePeerOpen: function(id) {
-				this.self = id;
+				this.peerid = id;
 				console.info('PPS: Connection to server open.');
 				this.fire('server-connection');
 				this._main();
@@ -363,7 +415,7 @@
 
 			_performCall: function(remote) {
 				if (this._haveLocalStream) {
-					this._call = this.peer.call(remote, this._localStream);
+					this._call = this.peer.call(remote, this.localStream);
 					this._call.on('close', this._handleCallEnd.bind(this));
 					this._call.on('error', this._handleCallEnd.bind(this));
 
@@ -417,7 +469,7 @@
 				if (call.peer !== this.spectates && !this.answers) return;
 
 				this._call = call;
-				this._haveLocalStream ? call.answer(this._localStream) : call.answer();
+				this._haveLocalStream ? call.answer(this.localStream) : call.answer();
 				this._call.on('stream', this._handleStream.bind(this));
 				this._call.on('close', this._handleCallEnd.bind(this));
 				this._call.on('error', this._handleCallEnd.bind(this));
@@ -433,7 +485,7 @@
 			},
 
 			_handleStream: function(stream) {
-				this._remoteStream = stream;
+				this.remoteStream = stream;
 				this._remoteStreamURL = URL.createObjectURL(stream);
 				stream.addEventListener('ended', this._handleStreamEnded.bind(this)); // TODO does this leak?
 				this._mainDelayed(); // TODO: is this unnecessary?
