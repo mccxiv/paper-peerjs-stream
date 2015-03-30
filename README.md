@@ -3,7 +3,7 @@
 A web component for sending, receiving, and playing WebRTC media streams. Built with Polymer.
 
 #### Connecting two elements
-```
+```html
 <!-- calls.html -->
 <paper-peerjs-stream calls="john" key="apikey43" active id="caller"></paper-peerjs-stream>
 <script>
