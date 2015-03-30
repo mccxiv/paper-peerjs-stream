@@ -1,0 +1,617 @@
+<!--suppress ALL -->
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../paper-button/paper-button.html">
+<link rel="import" href="../paper-slider/paper-slider.html">
+<link rel="import" href="../paper-spinner/paper-spinner.html">
+
+<script src="../peerjs/peer.min.js"></script>
+<script src="../screenfull/dist/screenfull.js"></script>
+<script src="../web-animations-js/web-animations-next-lite.min.js"></script>
+
+<!--
+A Polymer element for using webrtc media streams.
+Powered by [PeerJS](http://peerjs.com).
+
+#### Calls & Answers - demo: <a href="demos/calls.html" target="_blank">calls.html</a>, <a href="demos/answers.html" target="_blank">answers.html</a>
+	// document.getElementById('caller').localStream = stream; (MediaStream)
+	<paper-peerjs-stream key="apikey43" id="caller" calls="john" active></paper-peerjs-stream>
+	<paper-peerjs-stream key="apikey43" peerid="john" answers active></paper-peerjs-stream>
+
+
+#### Spectates & Broadcasts - demo: <a href="demos/spectates.html" target="_blank">spectates.html</a>, <a href="demos/broadcasts.html" target="_blank">broadcasts.html</a> 
+	// spectators can contact broadcasters without providing a stream of their own
+	<paper-peerjs-stream key="apikey43" spectates="bob" active></paper-peerjs-stream>
+	<paper-peerjs-stream key="apikey43" peerid="bob" broadcasts active></paper-peerjs-stream>
+
+
+#### CSS styling - changing the UI color
+	paper-peerjs-stream /deep/ #sliderKnobInner,
+	paper-peerjs-stream /deep/ #progressContainer {
+		background-color: white;
+	}
+
+	paper-peerjs-stream /deep/ #fullscreen {				
+		color: white;
+	}
+
+
+#### Installation
+	$ bower install mccxiv/paper-peerjs-stream --save
+
+@element paper-peerjs-stream
+@blurb Declarative webrtc media streams
+@status alpha
+@author Andrea Stella
+@categories webrtc p2p
+@homepage http://github.com/mccxiv/paper-peerjs-stream
+-->
+
+<polymer-element name="paper-peerjs-stream">
+	<template>
+		<link rel="stylesheet" href="styles.css">
+			<video id="video" src="{{_remoteStreamURL}}" on-playing="{{_handlePlaying}}" autoplay></video>
+			<paper-spinner id="spinner" active></paper-spinner>
+			<div id="toolbar">
+				<paper-slider id="volume" value="[[volume]]" on-immediate-value-change="{{_volumeSliderChange}}" min="0" max="1" step="0.01"></paper-slider>
+				<paper-button id="fullscreen" on-click="{{_toggleFullscreen}}">
+					<core-icon icon="settings-overscan"></core-icon>
+				</paper-button>
+			</div>
+	</template>
+	<script>
+		'use strict';
+
+		//noinspection JSValidateTypes, JSUnusedGlobalSymbols, JSValidateJSDoc
+		Polymer({
+			/**
+			 * Fired when a call is successfully established.
+			 * @event in-call
+			 */
+
+			/**
+			 * Fired when this element's peer id, `peerid`, is changed, such as when
+			 * the server provides one.
+			 * @event new-id
+			 */
+			
+			/**
+			 * Fired when `remoteStream`, the remote media stream, ends.
+			 * @event no-remotes-stream
+			 */
+
+			/**
+			 * Fired when the call is closed, for whatever reason.
+			 * @event not-in-call
+			 */
+			
+			/**
+			 * Fired when attempting to reach a particular peer, but they
+			 * are not connected to the PeerJS server.
+			 * @event peer-unavailable
+			 */
+
+			/**
+			 * Fired when a remote media stream, `remoteStream`, is obtained from a call.
+			 * @event remotes-stream
+			 */
+
+			/**
+			 * Fired when the element successfully connects to the PeerJS server
+			 * @event server-connection
+			 */			
+			
+			publish: {
+				/**
+				 * The element will not perform any action unless the
+				 * `active` attribute is present.
+				 *
+				 * @attribute active
+				 * @type boolean
+				 */
+				active: {value: false, reflect: true},
+				
+				/**
+				 * The `answers` attribute tells the element to answer any
+				 * incoming call, it will answer without a local stream if
+				 * it was not available at the time when the incoming call
+				 * was answered.
+				 *
+				 * @attribute answers
+				 * @type boolean
+				 */
+				answers: {value: false, reflect: true},
+
+				/**
+				 * When `broadcasts` is true, the element will wait for
+				 * spectators to send call requests and respond by calling
+				 * them with its local media stream.
+				 *
+				 * A `call request` is a data connection with a particular
+				 * metadata. It is done this way because PeerJS does not
+				 * currently support one way calls, i.e. a stream must
+				 * be provided when initiating a call.
+				 *
+				 * @attribute broadcasts
+				 * @type boolean
+				 */
+				broadcasts: {value: false, reflect: true},
+
+				/**
+				 * The `calls` attribute specifies a remote id. When present
+				 * the element will attempt to call said id until successful,
+				 * unless no local stream is available.
+				 *
+				 * @attribute calls
+				 * @type string
+				 */
+				calls: null,
+
+				/**
+				 * For self hosted PeerJS servers, the `host` attribute
+				 * specifies the PeerJS server address, it should not
+				 * contain `http://` or any other scheme.
+				 *
+				 * @attribute host
+				 * @type string
+				 * @default 'localhost'
+				 */
+				host: 'localhost',
+
+				/**
+				 * The `key` attribute specifies the API key for use with the
+				 * PeerJS cloud server. If this attribute is specified,
+				 * `host`, `port` and `path` are ignored.
+				 * More info on the cloud server is available at http://peerjs.com/peerserver
+				 *
+				 * @attribute key
+				 * @type string
+				 */
+				key: null,
+
+				/**
+				 * For self hosted PeerJS servers, the `path` attribute
+				 * specifies the PeerJS path on the server. (e.g. /my-server/)
+				 *
+				 * @attribute path
+				 * @type string
+				 * @default '/'
+				 */
+				path: '/',
+
+				/**
+				 * The `peerid` attribute lets you reserve a particular id on
+				 * the server. It is optional, the server will provide a random
+				 * id if this was left unspecified.
+				 *
+				 * @attribute peerid
+				 * @type string
+				 */
+				peerid: {value: null, reflect: true},
+
+				/**
+				 * For self hosted PeerJS servers, the `port` attribute
+				 * specifies the PeerJS server port.
+				 *
+				 * @attribute port
+				 * @type number
+				 * @default 80
+				 */
+				port: 80,
+
+				/**
+				 * The `spectates` attribute specifies a broadcaster's id and
+				 * makes this element a spectator. Spectators get in contact
+				 * with the broadcaster (via data connection) and request to
+				 * be called. This transaction allows the spectator to receive
+				 * a stream without ever providing one.
+				 *
+				 * @attribute spectates
+				 * @type string
+				 */
+				spectates: {value: null, reflect: true},
+
+				/**
+				 * The `uicolor` attribute helps set the CSS color of the
+				 * various UI elements: volume slider and fullscreen button.
+				 * Colors may also be set via regular CSS, if finer control
+				 * is desired.
+				 *
+				 * @attribute uicolor
+				 * @type string
+				 * @default '#FF5722'
+				 */
+				uicolor: '#FF5722',
+				
+				/**
+				 * The `volume` attribute sets the loudness of the incoming
+				 * stream, from 0 to 1.
+				 *
+				 * @attribute volume
+				 * @type number
+				 * @default 0.75
+				 */
+				volume: {value: 0.75, reflect: true},
+			},
+
+			/**
+			 * The `localStream` property holds the local media stream, this
+			 * stream will be sent to anyone that engages in a call with with
+			 * this peer.
+			 *
+			 * @property localStream
+			 * @type MediaStream|null
+			 */
+			localStream: null,
+
+			/**
+			 * The `remoteStream` property holds the incoming media stream that
+			 * was obtained through a call with another peer.
+			 *
+			 * @property remoteStream
+			 * @type MediaStream|null
+			 */
+			remoteStream: null,
+
+			/**
+			 * The `peer` property holds the PeerJS instance. Note that this 
+			 * object will change throughout the element's lifecycle, you 
+			 * should not hold your own reference to it.
+			 *
+			 * @property peer
+			 * @type Object|null
+			 */
+			peer : null,
+
+			computed: {
+				_peerActive: 'peer && !peer.destroyed && !peer.disconnected',
+				_inActiveCall: '_call && _call.open',
+				_peerDestroyed: 'peer && peer.destroyed',
+				_peerDisconnected: 'peer && peer.disconnected',
+				_haveLocalStream: 'localStream && !localStream.ended',
+				_haveRemoteStream: 'remoteStream && !remoteStream.ended'
+			},
+
+			_call: undefined,               // The current call
+			_timeout: 3000,                 // Wait this long between attempts
+			_queuedMain: 0,                 // To prevent multiple operations
+			_callRequest: undefined,        // reference to the call request, necessary to clean up
+			_remoteStreamURL: undefined,    // Stream in url form, for src
+			_queuedDestroyCall: undefined,  // To prevent multiple operations
+
+			_easing: 'cubic-bezier(.55, 0, .1, 1)',  // Easing function for use in animations
+
+			ready: function() {this._main();},
+
+			attributeChanged: function(attribute) {
+				if (attribute !== 'volume')	this._main();
+			},
+
+			volumeChanged: function() {
+				this.$.video.volume = this.volume;
+				// update slider? No, it bugs out
+			},
+
+			peeridChanged: function() {
+				this.fire('new-id', this.peerid);
+			},
+
+			_inActiveCallChanged: function(oldVal, newVal) {
+				if (newVal) {
+					this._uiHideSpinner();
+					this.fire('in-call');
+				}
+				else {
+					this._uiShowSpinner();
+					this.fire('not-in-call');
+				}
+			},
+
+			_haveRemoteStreamChanged: function(oldVal, newVal) {
+				if (newVal) this.fire('remote-stream', this.remoteStream);
+				else this.fire('no-remote-stream');
+			},
+
+			/**
+			 * Should run on events and when each operation finishes
+			 */
+			_main: function() {
+				if (!this.active) {
+					console.info('PPS: Not active, aborting.');
+					this._destroyCall();
+					this._destroyPeer();
+					return;
+				}
+				console.info('PPS: Checking what needs to be done.');
+				if (this.spectates || this.broadcasts || this.calls || this.answers) {
+					if (!this._call) {
+						if (!this._peerActive) {
+							console.info('PPS: Not in a call and peer not ready, preparing peer.');
+							if (this._peerDisconnected && !this._peerDestroyed) this.peer.reconnect();
+							else this._createPeer();
+						}
+						else if (this.calls) {
+							console.info('PPS: Not in a call and need to call someone, calling...');
+							this._performCall(this.calls);
+						}
+						else if (this.spectates) {
+							console.info('PPS: Not in a call and should be spectating, requesting call.');
+							this._requestCall();
+						}
+						else console.info('PPS: Waiting for connections...')
+					}
+					else {
+						if (!this._call.open) {
+							// TODO figure out why this happens. Bandaid fix for now
+							console.info('PPS: Call exists but not open for some reason. Destroying it in 3 seconds if still closed.');
+							this._destroyCallIfUnopenedDelayed();
+						}
+						else {
+							if (!this._peerDisconnected) {
+								console.info('PPS: Already in a call, disconnecting from server as it\'s not needed.');
+								this.peer.disconnect();
+							}
+							else {
+								console.info('PPS: No work needed, already in call. Idling until next event.');
+							}
+						}
+					}
+				}
+				else console.info('PPS: No work needed, no tasks declared.')
+			},
+
+			_mainDelayed: function() {
+				if (this._queuedMain) return;
+				this._queuedMain = setTimeout(function() {
+					this._queuedMain = null;
+					this._main();
+				}.bind(this), this._timeout);
+			},
+
+			_destroyCallIfUnopenedDelayed: function() {
+				if (this._queuedDestroyCall) return;
+				this._queuedDestroyCall = setTimeout(function() {
+					console.info('PPS: Call is still closed, destroying it.')
+					this._queuedDestroyCall = null;
+					if (this._call && !this._call.open) {
+						this._destroyCall();
+					}
+					this._main();
+				}.bind(this), this._timeout);
+			},
+
+			_createPeer: function() {
+				var peerOpts = {debug: 3};
+				if (this.key) peerOpts.key = this.key;
+				else {
+					peerOpts.host = this.host;
+					peerOpts.port = this.port;
+					peerOpts.path = this.path;
+				}
+				this.peer = this.peerid ? new Peer(this.peerid, peerOpts) : new Peer(peerOpts);
+				console.info('PPS: Peer created, waiting for open event');
+				this.peer.on('call', this._handleCall.bind(this));
+				this.peer.on('open', this._handlePeerOpen.bind(this));
+				this.peer.on('error', this._handlePeerError.bind(this));
+				this.peer.on('connection', this._handleConnection.bind(this));
+				this.peer.on('disconnected', this._handlePeerDisconnected.bind(this));
+			},
+
+			_destroyPeer: function() {
+				if (this.peer) {
+					console.info('PPS: Destroying peer.');
+					this.peer.destroy();
+					this.peer.removeAllListeners();
+				}
+			},
+
+			_destroyCall: function() {
+				console.info('PPS: Closing any existing call.');
+				if (this._call) {
+					this._call.close();
+					this._call = null;
+				}
+			},
+
+			_destroyCallRequest: function() {
+				console.info('PPS: Closing failed call request. (probably peer-unavailable)');
+				if (this._callRequest) this._callRequest.close();
+			},
+
+			_handlePeerOpen: function(id) {
+				this.peerid = id;
+				console.info('PPS: Connection to server open.');
+				this.fire('server-connection');
+				this._main();
+			},
+
+			_handlePeerDisconnected: function(e) {
+				console.info('PPS: Peer disconnected', e);
+				this._mainDelayed();
+			},
+
+			_handlePeerError: function(error) {
+				console.info('PPS: Peer error', error);
+				switch (error.type) {
+					case 'peer-unavailable':
+						this.fire('peer-unavailable', error);
+						this._destroyCallRequest();
+						this._mainDelayed();
+						break
+					case 'network':
+						// Non fatal, let the 'disconnected' handler handle it instead.
+						break
+					default:
+						// Assume fatal error, make sure it's killed.
+						this._destroyPeer();
+						this._mainDelayed();
+				}
+			},
+
+			_handleConnection: function(conn) {
+				if (this.broadcasts) {
+					if (conn.metadata === 'call-request') {
+						this._handleCallRequest(conn.peer);
+					}
+				}
+			},
+
+			_handleCallRequest: function(remote) {
+				if (!this._call) this._performCall(remote);
+				else console.warn('PPS: Already in a call, ignoring call-request.');
+			},
+
+			_performCall: function(remote) {
+				if (this._haveLocalStream) {
+					this._call = this.peer.call(remote, this.localStream);
+					this._attachCallListeners(this._call);
+
+					// this._main(); TODO: why doesn't this work?
+					this._mainDelayed();
+				}
+				else {
+					console.warn('PPS: Want to call, but no stream is available.');
+					this._mainDelayed();
+				}
+			},
+
+			_requestCall: function() {
+				console.info('PPS: Requesting a call.')
+				var pps = this;
+				var successful = false;
+
+				// Need to save a reference in order to clean up later.
+				// Explanation: if the remote peer is unavailable it will
+				// trigger a peer error but NO connection error (why?!)
+				this._callRequest = this.peer.connect(this.spectates, {
+					reliable: true,
+					metadata: 'call-request'
+				});
+
+				var conn = this._callRequest;
+				conn.on('open', function () {
+					successful = true;
+					console.info('PPS: Closing unnecessary data connection.');
+					conn.close(); // Not needed anymore, request was sent.
+					conn.removeAllListeners();
+
+					// Now it's up to the broadcaster to call us back.
+					// Try again in a bit in case no call was received.
+					pps._mainDelayed()
+				});
+				conn.on('close', requestFailure);
+				conn.on('error', requestFailure);
+				function requestFailure() {
+					console.warn('PPS: Call request ended.');
+					conn.removeAllListeners();
+					if (!successful) {
+						console.warn('PPS: Call request failed.');
+						pps._mainDelayed();
+					}
+				}
+			},
+
+			_handleCall: function(call) {
+				if (this._call) return; // One at a time please.
+				if (call.peer !== this.spectates && !this.answers) return;
+
+				this._call = call;
+				this._haveLocalStream ? call.answer(this.localStream) : call.answer();
+				this._attachCallListeners(call);				
+
+				//this._main(); // breaks!
+				this._mainDelayed(); // TODO: why does this work but not previous?
+			},
+			
+			_attachCallListeners: function(call) {
+				call.on('stream', this._handleStream.bind(this));
+				call.on('close', this._handleCallEnd.bind(this));
+				call.on('error', this._handleCallEnd.bind(this));
+			},
+
+			_handleCallEnd: function(e) {
+				console.warn('PPS: Call ended, cleaning up its listeners.');
+				this._destroyCall();
+				this._mainDelayed();
+			},
+
+			_handleStream: function(stream) {
+				this.remoteStream = stream;
+				this._remoteStreamURL = URL.createObjectURL(stream);
+				stream.addEventListener('ended', this._handleStreamEnded.bind(this)); // TODO does this leak?
+				this._mainDelayed(); // TODO: is this unnecessary?
+			},
+
+			_handleStreamEnded: function()
+			{
+				console.warn('PPS: Stream ended, reconnecting...');
+				this._destroyCall();
+				this._uiHandleStreamEnd();
+				this._mainDelayed();
+			},
+
+			_handlePlaying: function() {
+				this._uiHandleStreamStart()
+			},
+
+			/* UI handlers */
+			_volumeSliderChange: function() {
+				this.volume = this.$.volume.immediateValue;
+			},
+
+			_toggleFullscreen: function() {
+				if (screenfull.enabled) {
+					screenfull.toggle(this);
+					if (screenfull.isFullscreen) {
+						this.style.display = 'block';
+						this.style.width = '100%';
+						this.style.height = '100%';
+					}
+					else {
+						this.style.removeProperty('display');
+						this.style.removeProperty('width');
+						this.style.removeProperty('height');
+					}
+				}
+			},
+			
+			_uiHandleStreamStart: function() {
+				this._uiHideSpinner();
+				this._uiShowVideo();
+			},
+
+			_uiHandleStreamEnd: function() {
+				this._uiShowSpinner();
+			},
+
+			_uiShowSpinner: function() {
+				var spinner = this.$.spinner;
+				var from =  {opacity: 0};
+				var to =    {opacity: 1};
+				var opts =  {duration: 5000, easing: this._easing};
+				spinner.setAttribute('active', true);
+				spinner.style.display = 'inline-block';
+				spinner.animate([from, to], opts);
+			},
+
+			_uiHideSpinner: function() {
+				var spinner = this.$.spinner;
+				var from =  {opacity: 1};
+				var to =    {opacity: 0};
+				var opts =  {duration: 500, easing: this._easing};
+				var anim = spinner.animate([from, to], opts);
+
+				anim.addEventListener('finish', function() {
+					spinner.removeAttribute('active');
+					spinner.style.display = 'none';
+				}.bind(this));
+			},
+
+			_uiShowVideo: function() {
+				var from =  {opacity: 0, transform: 'scale3d(.3, .3, .3)'};
+				var to =    {opacity: 1, transform: 'none'};
+				var opts =  {duration: 500, easing: this._easing};
+				this.$.video.animate([from, to], opts);
+			}
+		});
+	</script>
+</polymer-element>
