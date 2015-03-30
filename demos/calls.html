@@ -5,7 +5,7 @@
 		<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
 	</head>
 	<body>
-		<paper-peerjs-stream key="y6ws1u4by75mte29" peerid="broadcaster" broadcasts active></paper-peerjs-stream>
+		<paper-peerjs-stream key="y6ws1u4by75mte29" calls="john"></paper-peerjs-stream>
 
 		<script>
 			pps = document.querySelector('paper-peerjs-stream');
@@ -13,7 +13,10 @@
 
 			navigator.getUserMedia(
 				{video: true},
-				function success(stream) {pps.localStream = stream;},
+				function success(stream) {
+					pps.localStream = stream;
+					pps.active = true;
+				},
 				function err(e) {}
 			);
 		</script>

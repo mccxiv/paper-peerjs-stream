@@ -60,8 +60,8 @@
 	background-color: inherit;
 }
 
-#volume /deep/ #sliderKnobInner,
-#volume /deep/ #progressContainer {
+paper-slider /deep/ #sliderKnobInner,
+paper-slider /deep/ #progressContainer {
 	background-color: {{uicolor}};
 }
 

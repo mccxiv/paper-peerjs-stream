@@ -5,11 +5,13 @@
 		<link rel="import" href="../../paper-peerjs-stream/paper-peerjs-stream.html">
 	</head>
 	<body>
-		<!-- Requests to get be called by 'broadcaster' -->
 		<paper-peerjs-stream key="y6ws1u4by75mte29" spectates="broadcaster" active></paper-peerjs-stream>
-
+	
 		<script>
-			var p = document.querySelector('paper-peerjs-stream');
+			var pps = document.querySelector('paper-peerjs-stream');
+			pps.addEventListener('peer-unavailable', function() {
+				console.log('pu');
+			});
 		</script>
 	</body>
 </html>
