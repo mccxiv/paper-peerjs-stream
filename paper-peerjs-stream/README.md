@@ -4,5 +4,4 @@ Polymer element to do webrtc streams
 ### Scope
 Only supports a single peer
 
-### Status
-Not ready
+### [Documentation and demos](http://mccxiv.github.io/paper-peerjs-stream/paper-peerjs-stream/).
