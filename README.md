@@ -15,4 +15,4 @@ A web component for sending, receiving, and playing WebRTC media streams. Built 
 <paper-peerjs-stream peerid="john" answers key="apikey43" active></paper-peerjs-stream>
 ```
 
-### [Full documentation and demos](http://mccxiv.github.io/paper-peerjs-stream/paper-peerjs-stream/).
+### [Full documentation and demos](http://mccxiv.github.io/paper-peerjs-stream/paper-peerjs-stream/)
