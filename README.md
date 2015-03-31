@@ -10,7 +10,9 @@ A web component for sending, receiving, and playing WebRTC media streams. Built 
 	// Caller needs a local stream to send out, e.g. from getUserMedia()
 	document.querySelector('#caller').localStream = stream;
 </script>
+```
 
+```html
 <!-- answers.html -->
 <paper-peerjs-stream peerid="john" answers key="apikey43" active></paper-peerjs-stream>
 ```
