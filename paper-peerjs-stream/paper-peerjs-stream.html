@@ -9,20 +9,32 @@
 <script src="../web-animations-js/web-animations-next-lite.min.js"></script>
 
 <!--
-A Polymer element for using webrtc media streams.
+A web component for sending, receiving, and playing WebRTC media streams. Built with Polymer.
 Powered by [PeerJS](http://peerjs.com).
 
-#### Calls & Answers - demo: <a href="demos/calls.html" target="_blank">calls.html</a>, <a href="demos/answers.html" target="_blank">answers.html</a>
-	// document.getElementById('caller').localStream = stream; (MediaStream)
-	<paper-peerjs-stream key="apikey43" id="caller" calls="john" active></paper-peerjs-stream>
-	<paper-peerjs-stream key="apikey43" peerid="john" answers active></paper-peerjs-stream>
+- - -
+#### Calls & Answers 
+##### These two will trade their local streams and play back any incoming remote stream. <br>Callers require a local stream to perform a call. Demo <a href="demos/calls.html" target="_blank">calls.html</a>, <a href="demos/answers.html" target="_blank">answers.html</a>
+```
+<paper-peerjs-stream calls="john" key="apikey43" active id="caller"></paper-peerjs-stream>
+<paper-peerjs-stream peerid="john" answers key="apikey43" active></paper-peerjs-stream>
 
+<script>
+	// Caller needs a stream to send out, e.g. from getUserMedia()
+	document.querySelector('#caller').localStream = stream;
+</script>
+```
 
-#### Spectates & Broadcasts - demo: <a href="demos/spectates.html" target="_blank">spectates.html</a>, <a href="demos/broadcasts.html" target="_blank">broadcasts.html</a> 
-	// spectators can contact broadcasters without providing a stream of their own
-	<paper-peerjs-stream key="apikey43" spectates="bob" active></paper-peerjs-stream>
-	<paper-peerjs-stream key="apikey43" peerid="bob" broadcasts active></paper-peerjs-stream>
+- - -
 
+#### Spectates & Broadcasts
+##### Spectators can contact broadcasters without providing a stream of their own. Demo: <a href="demos/spectates.html" target="_blank">spectates.html</a>, <a href="demos/broadcasts.html" target="_blank">broadcasts.html</a> 
+```
+<paper-peerjs-stream spectates="bob" key="apikey43" active></paper-peerjs-stream>
+<paper-peerjs-stream peerid="bob" broadcasts key="apikey43" active></paper-peerjs-stream>
+```
+
+- - -
 
 #### CSS styling - changing the UI color
 	paper-peerjs-stream /deep/ #sliderKnobInner,
@@ -34,9 +46,15 @@ Powered by [PeerJS](http://peerjs.com).
 		color: white;
 	}
 
+- - -
 
 #### Installation
 	$ bower install mccxiv/paper-peerjs-stream --save
+
+
+#### Limitations
+In its current form, each `paper-peerjs-stream` element only supports one to one connections.
+
 
 @element paper-peerjs-stream
 @blurb Declarative webrtc media streams
