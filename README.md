@@ -4,7 +4,7 @@ A web component for sending, receiving, and playing WebRTC media streams. Built 
 
 #### Connecting two elements
 ```html
-<!-- calls.html -->
+<!-- caller.html -->
 <paper-peerjs-stream calls="john" key="apikey43" active id="caller"></paper-peerjs-stream>
 <script>
 	// Caller needs a local stream to send out, e.g. from getUserMedia()
@@ -13,7 +13,7 @@ A web component for sending, receiving, and playing WebRTC media streams. Built 
 ```
 
 ```html
-<!-- answers.html -->
+<!-- answerer.html -->
 <paper-peerjs-stream peerid="john" answers key="apikey43" active></paper-peerjs-stream>
 ```
 
