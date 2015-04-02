@@ -51,6 +51,8 @@ Powered by [PeerJS](http://peerjs.com).
 #### Installation
 	$ bower install mccxiv/paper-peerjs-stream --save
 
+#### Tests
+You can run some behavior tests on <a target="_blank" href="tests/">this page</a>.
 
 #### Limitations
 In its current form, each `paper-peerjs-stream` element only supports one to one connections.
@@ -87,7 +89,7 @@ In its current form, each `paper-peerjs-stream` element only supports one to one
 			 */
 
 			/**
-			 * Fired when this element's `peerid` is changed, such as when
+			 * Fired when this e7lement's `peerid` is changed, such as when
 			 * the server provides one.
 			 * @event new-id
 			 */
@@ -286,7 +288,7 @@ In its current form, each `paper-peerjs-stream` element only supports one to one
 				_peerDestroyed: 'peer && peer.destroyed',
 				_peerDisconnected: 'peer && peer.disconnected',
 				_haveLocalStream: 'localStream && !localStream.ended',
-				_haveRemoteStream: 'remoteStream && !remoteStream.ended'
+				_haveRemoteStream: 'remoteStream && remoteStream.active'
 			},
 
 			_call: undefined,               // The current call
@@ -561,6 +563,7 @@ In its current form, each `paper-peerjs-stream` element only supports one to one
 
 			_handleStreamEnded: function()
 			{
+				this._haveRemoteStream; // Do not remove. Hack to trigger *Changed
 				console.warn('PPS: Stream ended, reconnecting...');
 				this._destroyCall();
 				this._uiHandleStreamEnd();
